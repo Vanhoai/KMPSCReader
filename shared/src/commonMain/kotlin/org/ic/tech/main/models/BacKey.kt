@@ -1,8 +1,7 @@
 package org.ic.tech.main.models
 
-data class BacKeyModel(
+data class BacKey(
     val documentNumber: String,
     val expireDate: String,
     val birthDate: String,
 )
-

@@ -17,6 +17,9 @@ kotlin = "2.1.0"
 
 # Mvvm Moko
 mvvmCore = "0.16.1"
+arrow = "1.2.4"
+jmrtd = "0.5.5"
+prov = "1.54.0.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -35,6 +38,12 @@ androidx-lifecycle-runtime-compose = { group = "org.jetbrains.androidx.lifecycle
 mvvm-core = { module = "dev.icerock.moko:mvvm-core", version.ref = "mvvmCore" }
 mvvm-flow = { module = "dev.icerock.moko:mvvm-flow", version.ref = "mvvmCore" }
 mvvm-flow-compose = { module = "dev.icerock.moko:mvvm-flow-compose", version.ref = "mvvmCore" }
+
+arrow-core = { module = "io.arrow-kt:arrow-core", version.ref = "arrow" }
+arrow-fx-coroutines = { module = "io.arrow-kt:arrow-fx-coroutines", version.ref = "arrow" }
+
+jmrtd = { module = "org.jmrtd:jmrtd", version.ref = "jmrtd" }
+prov = { module = "com.madgag.spongycastle:prov", version.ref = "prov" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

@@ -38,6 +38,12 @@ kotlin {
             api(libs.mvvm.core)
             api(libs.mvvm.flow)
             api(libs.mvvm.flow.compose)
+
+            api(libs.arrow.core)
+            api(libs.arrow.fx.coroutines)
+
+            api(libs.jmrtd)
+            api(libs.prov)
         }
 
         iosMain.dependencies {
