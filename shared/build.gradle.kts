@@ -13,7 +13,7 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
+
     listOf(
         iosX64(),
         iosArm64(),
@@ -22,12 +22,27 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "Shared"
             isStatic = true
+
+            export(libs.mvvm.core)
+            export(libs.mvvm.flow)
         }
     }
-    
+
     sourceSets {
         commonMain.dependencies {
-            // put your Multiplatform dependencies here
+            implementation(libs.mvvm.core)
+            implementation(libs.mvvm.flow)
+        }
+
+        androidMain.dependencies {
+            api(libs.mvvm.core)
+            api(libs.mvvm.flow)
+            api(libs.mvvm.flow.compose)
+        }
+
+        iosMain.dependencies {
+            api(libs.mvvm.core)
+            api(libs.mvvm.flow)
         }
     }
 }
