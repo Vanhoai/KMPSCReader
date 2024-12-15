@@ -163,10 +163,10 @@ class AndroidBacHandler {
 
         val response = tagReader.send(command)
         // Response APDU -> 42 bytes = 32 byte expected data + 8 byte mac + 2 byte status
-        val responseBytes = ADPUValidator.checkIsSuccessAndDropSW(response)
+        val responseBytes = APDUValidator.checkIsSuccessAndDropSW(response)
         // After check state and drop SW, we have the response with 40 bytes
         if (responseBytes.isEmpty()) {
-            val message = ADPUValidator.decodeStatus(response)
+            val message = APDUValidator.decodeStatus(response)
             return Either.Left(
                 ReadIdCardResponse(
                     status = ReadIdCardStatus.Failed,

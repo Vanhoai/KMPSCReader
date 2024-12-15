@@ -225,4 +225,13 @@ object PassportLib {
             tlLength + vLength
         }
     }
+
+    fun wrapDO(tag: Byte, data: ByteArray?): ByteArray {
+        requireNotNull(data) { "Data to wrap is null" }
+        val result = ByteArray(data.size + 2)
+        result[0] = tag
+        result[1] = data.size.toByte()
+        System.arraycopy(data, 0, result, 2, data.size)
+        return result
+    }
 }

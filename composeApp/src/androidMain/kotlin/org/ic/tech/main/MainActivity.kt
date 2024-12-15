@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.ic.tech.main.core.AndroidBacHandler
 import org.ic.tech.main.core.AndroidTagReader
+import org.ic.tech.main.core.ChipAuthenticationHandler
 import org.ic.tech.main.models.BacKey
 import org.ic.tech.main.models.ReadIdCardStatus
 import org.ic.tech.main.readers.passport.PassportReader
@@ -73,7 +74,12 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             val tagReader = AndroidTagReader(tag)
             val bacHandler = AndroidBacHandler()
-            val passportReader = AndroidPassportReader(tagReader, bacHandler)
+            val chipAuthenticationHandler = ChipAuthenticationHandler()
+            val passportReader = AndroidPassportReader(
+                tagReader,
+                bacHandler,
+                chipAuthenticationHandler
+            )
             val updateBacKeyResponse = passportReader.updateBacKey(
                 BacKey(
                     documentNumber = "203014513",

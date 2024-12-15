@@ -3,7 +3,7 @@ package org.ic.tech.main.core
 import org.ic.tech.main.models.ReadIdCardResponse
 import org.ic.tech.main.models.ReadIdCardStatus
 
-object ADPUValidator {
+object APDUValidator {
 
     /**
      * Status Error ADPU Map

@@ -7,6 +7,12 @@ data class ResponseAPDU(
     val sw1: Byte,
     val sw2: Byte
 ) {
+    constructor(apdu: ByteArray) : this(
+        data = apdu.sliceArray(0 until apdu.size - 2),
+        sw1 = apdu[apdu.size - 2],
+        sw2 = apdu[apdu.size - 1]
+    )
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null || this::class != other::class) return false
@@ -33,6 +39,10 @@ data class ResponseAPDU(
         ous.write(sw1.toInt())
         ous.write(sw2.toInt())
         return ous.toByteArray()
+    }
+
+    fun isSuccess(): Boolean {
+        return sw1 == 0x90.toByte() && sw2 == 0x00.toByte()
     }
 
     companion object {

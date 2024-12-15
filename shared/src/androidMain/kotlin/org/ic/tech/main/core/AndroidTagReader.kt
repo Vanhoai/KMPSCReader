@@ -44,7 +44,7 @@ class AndroidTagReader(private val tag: Tag) {
         )
 
         val response = isoDep?.transceive(command.toByteArray())
-        return ADPUValidator.checkIsSuccessAndDropSW(response ?: byteArrayOf())
+        return APDUValidator.checkIsSuccessAndDropSW(response ?: byteArrayOf())
     }
 
     suspend fun finalize(): Boolean {
@@ -97,7 +97,7 @@ class AndroidTagReader(private val tag: Tag) {
             ne = 14,
         )
         val response = isoDep?.transceive(command.toByteArray())
-        return ADPUValidator.parseResponse(response ?: byteArrayOf())
+        return APDUValidator.parseResponse(response ?: byteArrayOf())
     }
 
     fun send(cmd: AndroidNFCISO7816APDU): ByteArray {
@@ -107,15 +107,13 @@ class AndroidTagReader(private val tag: Tag) {
 
     fun sendSelectFileAndReadDataGroup(dg: DataGroup): ByteArray {
         val response = sendSelectFile(dg.value)
-        if (!ADPUValidator.isSuccess(response)) return byteArrayOf()
+        if (!APDUValidator.isSuccess(response)) return byteArrayOf()
 
         var data: ByteArray = byteArrayOf()
         val fileInfo: ByteArray = getFileInfo()
         data = data.plus(fileInfo)
-
         val fileLength = PassportLib.getFileLength(fileInfo)
         data = data.plus(getFileContent(fileLength))
-
         return data
     }
 
@@ -142,9 +140,7 @@ class AndroidTagReader(private val tag: Tag) {
     ): ByteArray? {
         var mutableLe = le
         var commandAPDU: AndroidNFCISO7816APDU? = null
-        if (mutableLe == 0) {
-            return null
-        }
+        if (mutableLe == 0) return null
         // In the case of long read 2/3 less bytes of the actual data will be returned,
         // because a tag and length will be sent along, here we need to account for this
         if (isExtendedLength) {
@@ -153,7 +149,6 @@ class AndroidTagReader(private val tag: Tag) {
             } else if (mutableLe < 256) {
                 mutableLe += 3
             }
-
             if (mutableLe > 256) {
                 mutableLe = 256
             }
@@ -183,10 +178,10 @@ class AndroidTagReader(private val tag: Tag) {
         }
 
         val response = sendWithSecureMessaging(commandAPDU)
-        return response.data
+        return response.copyOfRange(0, response.size - 2)
     }
 
-    private fun sendSelectFile(fid: Short): ResponseAPDU {
+    private fun sendSelectFile(fid: Short): ByteArray {
         val fiddle = byteArrayOf(
             (fid.toInt() shr 8 and 0xFF).toByte(),
             (fid.toInt() and 0xFF).toByte()
@@ -205,11 +200,28 @@ class AndroidTagReader(private val tag: Tag) {
         return response
     }
 
-    private fun sendWithSecureMessaging(apdu: AndroidNFCISO7816APDU): ResponseAPDU {
+    private fun sendWithSecureMessaging(apdu: AndroidNFCISO7816APDU): ByteArray {
         val message = secureMessaging!!.protect(apdu)
         val response = isoDep?.transceive(message.toByteArray())
-        val adpuResponse = ResponseAPDU.fromByteArray(response ?: byteArrayOf())
-        return secureMessaging!!.unprotect(adpuResponse)
+        return secureMessaging!!.unprotect(response ?: byteArrayOf())
+    }
+
+    fun sendMSEKAT(keyData: ByteArray, idData: ByteArray?): ResponseAPDU {
+        val data = ByteArray(keyData.size + (idData?.size ?: 0))
+        System.arraycopy(keyData, 0, data, 0, keyData.size)
+
+        if (idData != null) System.arraycopy(idData, 0, data, keyData.size, idData.size)
+
+        val commandAPDU = AndroidNFCISO7816APDU(
+            MISO7816.CLA_ISO7816.toInt(),
+            MISO7816.INS_MSE.toInt(),
+            0x41,
+            0xA6,
+            data
+        )
+
+        val response = sendWithSecureMessaging(commandAPDU)
+        return ResponseAPDU(response)
     }
 
     companion object {

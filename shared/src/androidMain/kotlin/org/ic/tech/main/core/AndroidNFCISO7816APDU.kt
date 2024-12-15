@@ -16,7 +16,7 @@ class AndroidNFCISO7816APDU(
     val ne: Int,
 ) {
     var nc: Int? = null
-    var apdu: ByteArray? = null
+    private var apdu: ByteArray? = null
     private var dataOffset: Int? = null
 
     // int cla, int ins, int p1, int p2, int ne
@@ -30,6 +30,22 @@ class AndroidNFCISO7816APDU(
         0,
         0,
         ne
+    )
+
+    // int cla, int ins, int p1, int p2, int ne
+    // this(cla, ins, p1, p2, null, 0, 0, ne);
+
+    // int cla, int ins, int p1, int p2, byte[] data
+    // this(cla, ins, p1, p2, data, 0, arrayLength(data), 0);
+    constructor(cla: Int, ins: Int, p1: Int, p2: Int, data: ByteArray) : this(
+        cla,
+        ins,
+        p1,
+        p2,
+        data,
+        0,
+        arrayLength(data),
+        0
     )
 
     // int cla, int ins, int p1, int p2, byte[] data, int ne

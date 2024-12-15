@@ -1,5 +1,6 @@
 package org.ic.tech.main.core
 
+import org.ic.tech.main.core.extensions.toHexString
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -67,7 +68,7 @@ class SecureMessaging(
         val do8E = PassportLib.build8E(mac)
 
         val dataToSend = do8587 + do97 + do8E
-        val newAdpu = AndroidNFCISO7816APDU(
+        val newApdu = AndroidNFCISO7816APDU(
             masked[0].toInt(),
             masked[1].toInt(),
             masked[2].toInt(),
@@ -76,14 +77,13 @@ class SecureMessaging(
             256
         )
 
-        return newAdpu
+        return newApdu
     }
-    
-    @Throws(GeneralSecurityException::class, IOException::class)
-    fun unprotect(apdu: ResponseAPDU): ResponseAPDU {
-        incrementSCC()
 
-        val inputStream = DataInputStream(ByteArrayInputStream(apdu.toByteArray()))
+    @Throws(GeneralSecurityException::class, IOException::class)
+    fun unprotect(apdu: ByteArray): ByteArray {
+        incrementSCC()
+        val inputStream = DataInputStream(ByteArrayInputStream(apdu))
         var data = ByteArray(0)
         var sw: Short = 0
         var finished = false
@@ -103,13 +103,12 @@ class SecureMessaging(
             }
         }
 
-        check(!(cc != null && !checkMac(apdu.toByteArray(), cc))) { "Mac not valid for APDU" }
+        check(!(cc != null && !checkMac(apdu, cc))) { "Mac not valid for APDU" }
         val ous = ByteArrayOutputStream()
         ous.write(data, 0, data.size)
         ous.write(sw.toInt() and 0xFF00 shr 8)
         ous.write(sw.toInt() and 0x00FF)
-        val bytes = ous.toByteArray()
-        return ResponseAPDU.fromByteArray(bytes)
+        return ous.toByteArray()
     }
 
     @Throws(GeneralSecurityException::class)
