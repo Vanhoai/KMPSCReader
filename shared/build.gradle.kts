@@ -1,3 +1,4 @@
+import org.gradle.kotlin.dsl.resolver.buildSrcSourceRootsFilePath
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -56,10 +57,12 @@ kotlin {
 android {
     namespace = "org.ic.tech.main.shared"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
     }

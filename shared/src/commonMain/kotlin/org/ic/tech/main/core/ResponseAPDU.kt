@@ -2,8 +2,8 @@ package org.ic.tech.main.core
 
 data class ResponseAPDU(
     val data: ByteArray,
-    val sw1: Byte,
-    val sw2: Byte
+    val sw1: UByte,
+    val sw2: UByte
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -20,9 +20,23 @@ data class ResponseAPDU(
 
     override fun hashCode(): Int {
         var result = data.contentHashCode()
-        result = 31 * result + sw1
-        result = 31 * result + sw2
+        result = 31 * result + sw1.hashCode()
+        result = 31 * result + sw2.hashCode()
         return result
     }
 
+    companion object {
+        fun fromByteArray(byteArray: ByteArray): ResponseAPDU {
+            require(byteArray.size >= 2) { "APDU must be at least 2 bytes long" }
+
+            val sw1 = byteArray[byteArray.size - 2].toUByte()
+            val sw2 = byteArray[byteArray.size - 1].toUByte()
+
+            return ResponseAPDU(
+                data = byteArray.sliceArray(0 until byteArray.size - 2),
+                sw1 = sw1,
+                sw2 = sw2
+            )
+        }
+    }
 }

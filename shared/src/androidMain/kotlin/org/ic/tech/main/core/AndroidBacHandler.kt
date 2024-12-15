@@ -5,17 +5,16 @@ import arrow.core.getOrElse
 import org.ic.tech.main.models.BacKey
 import org.ic.tech.main.models.ReadIdCardResponse
 import org.ic.tech.main.models.ReadIdCardStatus
-import org.ic.tech.main.readers.passport.BacHandler
 import java.security.SecureRandom
 import javax.crypto.SecretKey
 
-class AndroidBacHandler : BacHandler {
+class AndroidBacHandler {
 
     private val smk = SecureMessagingSessionKeyGenerator()
     private val sm = AndroidSecureMessaging()
 
-    override suspend fun doBACAuthentication(
-        tagReader: TagReader,
+    suspend fun doBACAuthentication(
+        tagReader: AndroidTagReader,
         bacKey: BacKey
     ): ReadIdCardResponse {
         try {
@@ -26,10 +25,9 @@ class AndroidBacHandler : BacHandler {
 
             return performBacAndGetSessionKey(tagReader, kEnc, kMac)
         } catch (exception: Exception) {
-            exception.printStackTrace()
             return ReadIdCardResponse(
                 status = ReadIdCardStatus.Failed,
-                message = "Failed to Bac Authentication ⚠️",
+                message = "Failed to Bac Authentication ⚠️with message: ${exception.message}",
                 data = mapOf()
             )
         }
@@ -55,7 +53,7 @@ class AndroidBacHandler : BacHandler {
     }
 
     private suspend fun performBacAndGetSessionKey(
-        tagReader: TagReader,
+        tagReader: AndroidTagReader,
         kEnc: SecretKey,
         kMac: SecretKey,
     ): ReadIdCardResponse {
@@ -67,7 +65,6 @@ class AndroidBacHandler : BacHandler {
         )
 
         val (rndIFD, kIFD) = randomKeyDevice()
-        println("rndIFD: $rndIFD, kIFD: $kIFD")
         // Key ICC 16 bytes
         val kICC = sendMutualAuthentication(
             tagReader = tagReader,
@@ -81,7 +78,18 @@ class AndroidBacHandler : BacHandler {
         }
 
         val response = generateSessionKey(kIFD, kICC, rndIFD, rndICC)
+        val ksEnc = response["KSEnc"] as SecretKey
+        val ksMac = response["KSMac"] as SecretKey
+        val ssc = response["SSC"] as Long
 
+        val secureMessaging = SecureMessaging(
+            ksEnc = ksEnc,
+            ksMac = ksMac,
+            ssc = ssc,
+            algorithm = SecureMessagingSupportedAlgorithms.DES
+        )
+
+        tagReader.updateSecureMessaging(secureMessaging)
         return ReadIdCardResponse(
             status = ReadIdCardStatus.PerformBacSuccess,
             message = "Perform BAC success and update session key ready for get data group ✅",
@@ -94,7 +102,7 @@ class AndroidBacHandler : BacHandler {
         kICC: ByteArray,
         rndIFD: ByteArray,
         rndICC: ByteArray,
-    ) {
+    ): Map<String, Any> {
         val keySeed = ByteArray(16)
         for (i in 0..15) {
             keySeed[i] = (kIFD[i].toInt() and 0xFF xor (kICC[i].toInt() and 0xFF)).toByte()
@@ -104,10 +112,16 @@ class AndroidBacHandler : BacHandler {
         val ksEnc = smk.deriveKey(keySeed, counter = 1)
         val ksMac = smk.deriveKey(keySeed, counter = 2)
         val ssc = smk.computeSendSequenceCounter(rndICC, rndIFD)
+
+        return mapOf(
+            "KSEnc" to ksEnc,
+            "KSMac" to ksMac,
+            "SSC" to ssc
+        )
     }
 
     private suspend fun sendMutualAuthentication(
-        tagReader: TagReader,
+        tagReader: AndroidTagReader,
         rndICC: ByteArray,
         rndIFD: ByteArray,
         kIFD: ByteArray,
@@ -127,37 +141,41 @@ class AndroidBacHandler : BacHandler {
         val encryptedData = sm.cipherEncrypt(kEnc, data)
         require(encryptedData.size == 32) { "Encrypted data must be 32 bytes long" }
 
-        val signature = sm.macSign(kMac, ParseMRZLib.padWithMRZ(encryptedData))
+        val signature = sm.macSign(kMac, PassportLib.padWithMRZ(encryptedData))
         require(signature.size == 8) { "Signature must be 8 bytes long" }
 
         // Prepare APDU
-        val p1: UByte = 0x00u // P1 Parameter
-        val p2: UByte = 0x00u // P2 Parameter
+        val p1: Byte = 0x00.toByte() // P1 Parameter
+        val p2: Byte = 0x00.toByte() // P2 Parameter
         data = ByteArray(32 + 8) // Data 40 bytes = 32 byte encrypted data + 8 byte signature
         System.arraycopy(encryptedData, 0, data, 0, 32)
         System.arraycopy(signature, 0, data, 32, 8)
         val le = 40 // Response length
 
-        val command = NFCISO7816APDU(
-            instructionClass = 0x00u,
-            instructionCode = 0xA4u,
-            p1Parameter = p1,
-            p2Parameter = p2,
+        val command = AndroidNFCISO7816APDU(
+            cla = MISO7816.CLA_ISO7816.toInt(),
+            ins = MISO7816.INS_EXTERNAL_AUTHENTICATE.toInt(),
+            p1 = p1.toInt(),
+            p2 = p2.toInt(),
             data = data,
-            expectedResponseLength = le
+            ne = le
         )
 
         val response = tagReader.send(command)
         // Response APDU -> 42 bytes = 32 byte expected data + 8 byte mac + 2 byte status
         val responseBytes = ADPUValidator.checkIsSuccessAndDropSW(response)
         // After check state and drop SW, we have the response with 40 bytes
-        if (responseBytes.isEmpty()) return Either.Left(
-            ReadIdCardResponse(
-                status = ReadIdCardStatus.Failed,
-                message = "Failed to send Mutual Authentication ⚠️",
-                data = mapOf()
+        if (responseBytes.isEmpty()) {
+            val message = ADPUValidator.decodeStatus(response)
+            return Either.Left(
+                ReadIdCardResponse(
+                    status = ReadIdCardStatus.Failed,
+                    message = "Failed to send Mutual Authentication ⚠️ with message: $message",
+                    data = mapOf()
+                )
             )
-        )
+        }
+
 
         require(responseBytes.size == 40) { "Response bytes must be 40 bytes long" }
         // Decrypt data 32 byte first in response -> except 8 byte signature

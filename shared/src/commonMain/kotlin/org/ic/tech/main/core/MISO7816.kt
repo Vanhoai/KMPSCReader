@@ -8,7 +8,7 @@ object MISO7816 {
     const val OFFSET_LC: Byte = 4.toByte()
     const val OFFSET_CDATA: Byte = 5.toByte()
 
-    const val CLA_ISO7816: UByte = 0x00u
+    const val CLA_ISO7816: Byte = 0x00.toByte()
     const val CLA_COMMAND_CHAINING: Byte = 0x10.toByte()
 
     const val INVALIDATE_CHV: Byte = 0x04
@@ -24,16 +24,16 @@ object MISO7816 {
     const val INS_MANAGE_CHANNEL: Byte = 0x70
     const val INS_EXTERNAL_AUTHENTICATE: Byte = 0x82.toByte()
     const val INS_MUTUAL_AUTHENTICATE: Byte = 0x82.toByte()
-    const val INS_GET_CHALLENGE: UByte = 0x84u
+    const val INS_GET_CHALLENGE: Byte = 0x84.toByte()
     const val INS_ASK_RANDOM: Byte = 0x84.toByte()
     const val INS_GIVE_RANDOM: Byte = 0x86.toByte()
     const val INS_INTERNAL_AUTHENTICATE: Byte = 0x88.toByte()
     const val INS_SEEK: Byte = 0xA2.toByte()
     const val INS_SELECT: Byte = 0xA4.toByte()
-    const val INS_SELECT_FILE: Byte = 0xA4.toByte()
+    const val INS_SELECT_FILE: UByte = 0xA4u
     const val INS_CLOSE_APPLICATION: Byte = 0xAC.toByte()
     const val INS_READ_BINARY: Byte = 0xB0.toByte()
-    const val INS_READ_BINARY2: Byte = 0xB1.toByte()
+    const val INS_READ_BINARY2: UByte = 0xB1u
     const val INS_READ_RECORD: Byte = 0xB2.toByte()
     const val INS_READ_RECORD2: Byte = 0xB3.toByte()
     const val INS_READ_RECORDS: Byte = 0xB2.toByte()
@@ -52,7 +52,7 @@ object MISO7816 {
     const val INS_APPEND_RECORD: Byte = 0xE2.toByte()
     const val INS_DELETE_FILE: Byte = 0xE4.toByte()
     const val INS_PSO: Byte = 0x2A.toByte()
-    const val INS_MSE: Byte = 0x22.toByte()
+    const val INS_MSE: UByte = 0x22u
 
     const val SW_BYTES_REMAINING_00: Short = 0x6100.toShort()
     const val SW_STATE_NON_VOLATILE_MEMORY_UNCHANGED_NO_INFORMATION_GIVEN: Short = 0x6200.toShort()

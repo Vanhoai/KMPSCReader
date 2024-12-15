@@ -98,7 +98,7 @@ object ADPUValidator {
      * Function decode status byte and status word
      * and return response if success or not.
      */
-    fun decodeStatus(sw1: UByte, sw2: UByte): String {
+    private fun decodeStatus(sw1: UByte, sw2: UByte): String {
         // Special cases - where sw2 isn't an error but contains a value
         return when (sw1) {
             0x61.toUByte() -> "SW2 indicates the number of response bytes still available - ($sw2 bytes still available)"
@@ -109,6 +109,12 @@ object ADPUValidator {
                     ?: "Unknown error - sw1: 0x${sw1.toString(16)}, sw2: 0x${sw2.toString(16)}"
             }
         }
+    }
+
+    fun decodeStatus(response: ByteArray): String {
+        val sw1 = response[response.size - 2].toUByte()
+        val sw2 = response[response.size - 1].toUByte()
+        return decodeStatus(sw1, sw2)
     }
 
     private fun isSuccess(sw1: UByte, sw2: UByte): Boolean {

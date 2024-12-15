@@ -4,7 +4,6 @@ enum class ReadIdCardStatus {
     StartReading,
     InitializeSuccess,
     SelectPassportApplicationSuccess,
-    SendGetChallengeSuccess,
     PerformBacSuccess,
     Success,
     Failed,

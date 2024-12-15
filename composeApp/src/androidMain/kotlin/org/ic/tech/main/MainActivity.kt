@@ -19,6 +19,8 @@ import org.ic.tech.main.core.AndroidTagReader
 import org.ic.tech.main.models.BacKey
 import org.ic.tech.main.models.ReadIdCardStatus
 import org.ic.tech.main.readers.passport.PassportReader
+import org.spongycastle.jce.provider.BouncyCastleProvider
+import java.security.Security
 
 class MainActivity : ComponentActivity() {
 
@@ -33,6 +35,8 @@ class MainActivity : ComponentActivity() {
         if (nfcAdapter == null) {
             finish()
         }
+
+        Security.insertProviderAt(BouncyCastleProvider(), BOUNCY_CASTLE_PROVIDER_POSITION)
     }
 
     override fun onResume() {
@@ -69,7 +73,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             val tagReader = AndroidTagReader(tag)
             val bacHandler = AndroidBacHandler()
-            val passportReader = PassportReader(tagReader, bacHandler)
+            val passportReader = AndroidPassportReader(tagReader, bacHandler)
             val updateBacKeyResponse = passportReader.updateBacKey(
                 BacKey(
                     documentNumber = "203014513",
@@ -87,6 +91,10 @@ class MainActivity : ComponentActivity() {
                 println("Response: $response")
             }
         }
+    }
+
+    companion object {
+        const val BOUNCY_CASTLE_PROVIDER_POSITION = 1
     }
 }
 
