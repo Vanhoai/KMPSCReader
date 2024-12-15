@@ -8,14 +8,13 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.IvParameterSpec
 
 class AndroidSecureMessaging {
-
     private fun initializeMac(kMac: SecretKey): Mac {
         val mac = Mac.getInstance(MAC_ALGORITHM)
         mac.init(kMac)
         return mac
     }
 
-    private fun initializeCipher(kEnc: SecretKey, mode: Int): Cipher {
+    fun initializeCipher(kEnc: SecretKey, mode: Int): Cipher {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(
             mode,

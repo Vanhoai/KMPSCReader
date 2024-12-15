@@ -121,6 +121,18 @@ object ADPUValidator {
         return sw1 == 0x90.toUByte() && sw2 == 0x00.toUByte()
     }
 
+    fun isSuccess(response: ResponseAPDU): Boolean {
+        return isSuccess(response.sw1.toUByte(), response.sw2.toUByte())
+    }
+
+    fun isSuccess(bytes: ByteArray): Boolean {
+        if (bytes.size < 2) return false
+
+        val sw1 = bytes[bytes.size - 2].toUByte()
+        val sw2 = bytes[bytes.size - 1].toUByte()
+        return isSuccess(sw1, sw2)
+    }
+
     fun checkIsSuccessAndDropSW(response: ByteArray): ByteArray {
         if (response.size < 2) return byteArrayOf()
 

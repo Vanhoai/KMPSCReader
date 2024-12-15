@@ -1,7 +1,12 @@
 package org.ic.tech.main.core
 
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.io.IOException
 import java.security.GeneralSecurityException
+import javax.crypto.Cipher
 import javax.crypto.SecretKey
 
 /**
@@ -72,5 +77,61 @@ class SecureMessaging(
         )
 
         return newAdpu
+    }
+    
+    @Throws(GeneralSecurityException::class, IOException::class)
+    fun unprotect(apdu: ResponseAPDU): ResponseAPDU {
+        incrementSCC()
+
+        val inputStream = DataInputStream(ByteArrayInputStream(apdu.toByteArray()))
+        var data = ByteArray(0)
+        var sw: Short = 0
+        var finished = false
+        var cc: ByteArray? = null
+
+        val cipher = sm.initializeCipher(ksEnc, Cipher.DECRYPT_MODE)
+        while (!finished) {
+            val tag = inputStream.readByte().toInt()
+            when (tag.toByte()) {
+                0x87.toByte() -> data = PassportLib.readDO87(cipher, inputStream, false)
+                0x85.toByte() -> data = PassportLib.readDO87(cipher, inputStream, true)
+                0x99.toByte() -> sw = PassportLib.readDO99(inputStream)
+                0x8E.toByte() -> {
+                    cc = PassportLib.readDO8E(inputStream)
+                    finished = true
+                }
+            }
+        }
+
+        check(!(cc != null && !checkMac(apdu.toByteArray(), cc))) { "Mac not valid for APDU" }
+        val ous = ByteArrayOutputStream()
+        ous.write(data, 0, data.size)
+        ous.write(sw.toInt() and 0xFF00 shr 8)
+        ous.write(sw.toInt() and 0x00FF)
+        val bytes = ous.toByteArray()
+        return ResponseAPDU.fromByteArray(bytes)
+    }
+
+    @Throws(GeneralSecurityException::class)
+    private fun checkMac(rApdu: ByteArray, cc1: ByteArray): Boolean {
+        return try {
+            val bOut = ByteArrayOutputStream()
+            val dataOut = DataOutputStream(bOut)
+            dataOut.writeLong(ssc)
+            val paddedData = PassportLib.padWithMRZ(rApdu, 0, rApdu.size - 2 - 8 - 2)
+            dataOut.write(paddedData, 0, paddedData.size)
+            dataOut.flush()
+            dataOut.close()
+
+            var cc2: ByteArray = sm.macSign(ksMac, bOut.toByteArray())
+            if (cc2.size > 8 && cc1.size == 8) {
+                val newCC2 = ByteArray(8)
+                System.arraycopy(cc2, 0, newCC2, 0, newCC2.size)
+                cc2 = newCC2
+            }
+            cc1.contentEquals(cc2)
+        } catch (ioe: IOException) {
+            false
+        }
     }
 }

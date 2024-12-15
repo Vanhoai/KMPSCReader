@@ -1,8 +1,15 @@
 package org.ic.tech.main.core
 
+import net.sf.scuba.tlv.TLVInputStream
 import org.ic.tech.main.core.extensions.isNotNull
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.IOException
+import java.security.GeneralSecurityException
+import javax.crypto.BadPaddingException
+import javax.crypto.Cipher
 import javax.crypto.SecretKey
 
 object PassportLib {
@@ -10,7 +17,7 @@ object PassportLib {
         return padWithMRZ(data, 0, data.size, blockSize)
     }
 
-    private fun padWithMRZ(
+    fun padWithMRZ(
         data: ByteArray,
         offset: Int = 0,
         length: Int,
@@ -25,7 +32,21 @@ object PassportLib {
         return out.toByteArray()
     }
 
-    fun convertToLengthDEFFormat(length: Int): ByteArray {
+    @Throws(BadPaddingException::class)
+    fun unpad(input: ByteArray): ByteArray {
+        var i = input.size - 1
+        while (i >= 0 && input[i].toInt() == 0x00) {
+            i--
+        }
+        if (input[i].toInt() and 0xFF != 0x80) {
+            throw BadPaddingException("Expected constant 0x80")
+        }
+        val out = ByteArray(i)
+        System.arraycopy(input, 0, out, 0, i)
+        return out
+    }
+
+    private fun convertToLengthDEFFormat(length: Int): ByteArray {
         val ous = ByteArrayOutputStream()
         if (length < 0x80) { // 0x80 = 128
             // Short form
@@ -130,5 +151,78 @@ object PassportLib {
         }
 
         return do8587
+    }
+
+    @Throws(IOException::class, GeneralSecurityException::class)
+    fun readDO8E(inputStream: DataInputStream): ByteArray {
+        val length = inputStream.readUnsignedByte()
+        check(length == 8) { "DO'8E wrong length" }
+        val cc1 = ByteArray(8)
+        inputStream.readFully(cc1)
+        return cc1
+    }
+
+    @Throws(IOException::class)
+    fun readDO99(inputStream: DataInputStream): Short {
+        val length = inputStream.readUnsignedByte()
+        check(length == 2) { "DO'99 wrong length" }
+        val sw1 = inputStream.readByte()
+        val sw2 = inputStream.readByte()
+        return (sw1.toInt() and 0x000000FF shl 8 or (sw2.toInt() and 0x000000FF)).toShort()
+    }
+
+    @Throws(IOException::class, GeneralSecurityException::class)
+    fun readDO87(
+        cipher: Cipher,
+        inputStream: DataInputStream,
+        do85: Boolean
+    ): ByteArray {
+        /* Read length... */
+        var length = 0
+        var buf = inputStream.readUnsignedByte()
+        if (buf and 0x00000080 != 0x00000080) {
+            /* Short form */
+            length = buf
+            if (!do85) {
+                buf = inputStream.readUnsignedByte() /* should be 0x01... */
+                check(buf == 0x01) {
+                    "DO'87 expected 0x01 marker, found " + Integer.toHexString(
+                        buf and 0xFF
+                    )
+                }
+            }
+        } else {
+            /* Long form */
+            val lengthBytesCount = buf and 0x0000007F
+            for (i in 0 until lengthBytesCount) {
+                length = length shl 8 or inputStream.readUnsignedByte()
+            }
+            if (!do85) {
+                buf = inputStream.readUnsignedByte() /* should be 0x01... */
+                check(buf == 0x01) { "DO'87 expected 0x01 marker" }
+            }
+        }
+        if (!do85) {
+            length-- /* takes care of the extra 0x01 marker... */
+        }
+        /* Read, decrypt, unpad the data... */
+        val ciphertext = ByteArray(length)
+        inputStream.readFully(ciphertext)
+        val paddedData: ByteArray = cipher.doFinal(ciphertext)
+        return unpad(paddedData)
+    }
+
+    fun getFileLength(fileInfo: ByteArray): Int {
+        val baInputStream = ByteArrayInputStream(fileInfo)
+        val tlvInputStream = TLVInputStream(baInputStream)
+        val tag = tlvInputStream.readTag()
+        return if (tag == 0x42.toByte().toInt()) {
+            36
+        } else {
+            val vLength = tlvInputStream.readLength()
+            val tlLength: Int =
+                fileInfo.size - baInputStream.available()
+            tlLength + vLength
+        }
     }
 }

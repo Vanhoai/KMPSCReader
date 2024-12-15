@@ -1,9 +1,11 @@
 package org.ic.tech.main.core
 
+import java.io.ByteArrayOutputStream
+
 data class ResponseAPDU(
     val data: ByteArray,
-    val sw1: UByte,
-    val sw2: UByte
+    val sw1: Byte,
+    val sw2: Byte
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -25,12 +27,20 @@ data class ResponseAPDU(
         return result
     }
 
+    fun toByteArray(): ByteArray {
+        val ous = ByteArrayOutputStream()
+        ous.write(data, 0, data.size)
+        ous.write(sw1.toInt())
+        ous.write(sw2.toInt())
+        return ous.toByteArray()
+    }
+
     companion object {
         fun fromByteArray(byteArray: ByteArray): ResponseAPDU {
             require(byteArray.size >= 2) { "APDU must be at least 2 bytes long" }
 
-            val sw1 = byteArray[byteArray.size - 2].toUByte()
-            val sw2 = byteArray[byteArray.size - 1].toUByte()
+            val sw1 = byteArray[byteArray.size - 2]
+            val sw2 = byteArray[byteArray.size - 1]
 
             return ResponseAPDU(
                 data = byteArray.sliceArray(0 until byteArray.size - 2),

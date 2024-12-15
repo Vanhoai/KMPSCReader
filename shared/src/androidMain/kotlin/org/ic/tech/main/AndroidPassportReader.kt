@@ -10,12 +10,12 @@ import kotlinx.coroutines.flow.update
 import org.ic.tech.main.core.AndroidBacHandler
 import org.ic.tech.main.core.AndroidTagReader
 import org.ic.tech.main.core.DataGroup
-import org.ic.tech.main.core.TagReader
+import org.ic.tech.main.core.extensions.toHexString
 import org.ic.tech.main.models.BacKey
 import org.ic.tech.main.models.ReadIdCardResponse
 import org.ic.tech.main.models.ReadIdCardStatus
-import org.ic.tech.main.readers.passport.BacHandler
 import org.ic.tech.main.readers.passport.PassportState
+import org.jmrtd.lds.DG14File
 import java.math.BigInteger
 import java.security.PublicKey
 
@@ -124,12 +124,23 @@ class AndroidPassportReader(
 
         val dg14: Map<BigInteger, PublicKey> = readDataGroup14() ?: return@flow
         val (key, value) = dg14.entries.iterator().next()
+        println("Key: ${value.encoded.toHexString()}")
     }
 
     private suspend fun FlowCollector<ReadIdCardResponse>.readDataGroup14(): Map<BigInteger, PublicKey>? {
         val data = tagReader.sendSelectFileAndReadDataGroup(dg = DataGroup.DG14)
-        println("DataGroup14: $data")
-        return null
+        if (data.isEmpty()) {
+            emit(
+                ReadIdCardResponse(
+                    status = ReadIdCardStatus.Failed,
+                    message = "DataGroup14 is empty ⚠️",
+                    data = mapOf()
+                )
+            )
+            return null
+        }
+        val dg14File = DG14File(data.inputStream())
+        return dg14File.getChipAuthenticationPublicKeyInfos()
     }
 
     private fun makeBacKey(): BacKey {

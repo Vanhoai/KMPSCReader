@@ -74,7 +74,7 @@ class AndroidTagReader(private val tag: Tag) {
      *  - A0 00 00 02 47 10 01 -> Data
      *  - 0x0E -> Expected Response Length
      */
-    suspend fun selectPassportApplication(): ReadIdCardResponse {
+    fun selectPassportApplication(): ReadIdCardResponse {
         requireNotNull(isoDep) { "IsoDep tag is null ⚠️" }
 
         // 07A00000024710010E
@@ -100,16 +100,93 @@ class AndroidTagReader(private val tag: Tag) {
         return ADPUValidator.parseResponse(response ?: byteArrayOf())
     }
 
-    suspend fun send(cmd: AndroidNFCISO7816APDU): ByteArray {
+    fun send(cmd: AndroidNFCISO7816APDU): ByteArray {
         val response = isoDep?.transceive(cmd.toByteArray())
         return response ?: byteArrayOf()
     }
 
-    suspend fun sendSelectFileAndReadDataGroup(dg: DataGroup) {
-        val response = sendSelectFile(DataGroup.DG14.value)
+    fun sendSelectFileAndReadDataGroup(dg: DataGroup): ByteArray {
+        val response = sendSelectFile(dg.value)
+        if (!ADPUValidator.isSuccess(response)) return byteArrayOf()
+
+        var data: ByteArray = byteArrayOf()
+        val fileInfo: ByteArray = getFileInfo()
+        data = data.plus(fileInfo)
+
+        val fileLength = PassportLib.getFileLength(fileInfo)
+        data = data.plus(getFileContent(fileLength))
+
+        return data
     }
 
-    private suspend fun sendSelectFile(fid: Short) {
+    private fun getFileContent(fileLength: Int): ByteArray {
+        var data: ByteArray = byteArrayOf()
+        var offset = 8
+        while (offset < fileLength) {
+            val le = DEFAULT_MAX_BLOCK_SIZE.coerceAtMost(fileLength - offset)
+            data = data.plus(sendReadBinary(offset, le, false)!!)
+            offset += le
+        }
+
+        return data
+    }
+
+    private fun getFileInfo(): ByteArray {
+        return sendReadBinary(0, READ_AHEAD_LENGTH)!!
+    }
+
+    private fun sendReadBinary(
+        offset: Int,
+        le: Int, // 8
+        isExtendedLength: Boolean = false
+    ): ByteArray? {
+        var mutableLe = le
+        var commandAPDU: AndroidNFCISO7816APDU? = null
+        if (mutableLe == 0) {
+            return null
+        }
+        // In the case of long read 2/3 less bytes of the actual data will be returned,
+        // because a tag and length will be sent along, here we need to account for this
+        if (isExtendedLength) {
+            if (mutableLe < 128) {
+                mutableLe += 2
+            } else if (mutableLe < 256) {
+                mutableLe += 3
+            }
+
+            if (mutableLe > 256) {
+                mutableLe = 256
+            }
+        }
+
+        val offsetHi = (offset and 0xFF00 shr 8).toByte()
+        val offsetLo = (offset and 0xFF).toByte()
+
+        commandAPDU = if (isExtendedLength) {
+            val data = byteArrayOf(0x54, 0x02, offsetHi, offsetLo)
+            AndroidNFCISO7816APDU(
+                MISO7816.CLA_ISO7816.toInt(),
+                MISO7816.INS_READ_BINARY2.toInt(),
+                0,
+                0,
+                data,
+                mutableLe
+            )
+        } else {
+            AndroidNFCISO7816APDU(
+                MISO7816.CLA_ISO7816.toInt(),
+                MISO7816.INS_READ_BINARY.toInt(),
+                offsetHi.toInt(),
+                offsetLo.toInt(),
+                mutableLe
+            )
+        }
+
+        val response = sendWithSecureMessaging(commandAPDU)
+        return response.data
+    }
+
+    private fun sendSelectFile(fid: Short): ResponseAPDU {
         val fiddle = byteArrayOf(
             (fid.toInt() shr 8 and 0xFF).toByte(),
             (fid.toInt() and 0xFF).toByte()
@@ -124,35 +201,19 @@ class AndroidTagReader(private val tag: Tag) {
             0
         )
 
-
-//        val response = sendWithSecureMessaging(command)
-//        println("Response send select file: $response")
-
-        val message = secureMessaging!!.protect(command)
-
-        // 00A4020C02010E00
-//        Before wrap command: 00A4020C02010E
-//        After wrap command: 0CA4020C1587090107244F3C0AADEF838E089DCF86AAE9F9A91B00
-//        After transceive: 990290008E080809777498B4DB729000
-//        Before Unwrap: 990290008E080809777498B4DB729000
-//        ssc: 6278077974196692664
-
-//        Send with message 1: 9701008e08015b8f431e51346200
-//        Send with message 2: 0ca4020c15870901295c42b90bf68ca38e08511b5bfd9671d08100
-
-
-        val response = isoDep?.transceive(message.toByteArray())
-
-        println("Response send select file: ${response?.toHexString()}")
+        val response = sendWithSecureMessaging(command)
+        return response
     }
 
-//    private suspend fun sendWithSecureMessaging(apdu: NFCISO7816APDU): ResponseAPDU {
-//        val message = secureMessaging!!.protect(apdu)
-//
-//        return ResponseAPDU(
-//            data = byteArrayOf(),
-//            sw1 = 0x90u,
-//            sw2 = 0x00u
-//        )
-//    }
+    private fun sendWithSecureMessaging(apdu: AndroidNFCISO7816APDU): ResponseAPDU {
+        val message = secureMessaging!!.protect(apdu)
+        val response = isoDep?.transceive(message.toByteArray())
+        val adpuResponse = ResponseAPDU.fromByteArray(response ?: byteArrayOf())
+        return secureMessaging!!.unprotect(adpuResponse)
+    }
+
+    companion object {
+        private const val READ_AHEAD_LENGTH = 8
+        private const val DEFAULT_MAX_BLOCK_SIZE = 224
+    }
 }
