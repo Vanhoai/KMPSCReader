@@ -15,7 +15,7 @@ class AndroidTagReader(private val tag: Tag) {
         this.secureMessaging = secureMessaging
     }
 
-    suspend fun initialize(): ReadIdCardResponse {
+    fun initialize(): ReadIdCardResponse {
         try {
             isoDep = IsoDep.get(tag)
             isoDep?.connect()
@@ -33,7 +33,7 @@ class AndroidTagReader(private val tag: Tag) {
         }
     }
 
-    suspend fun sendGetChallenge(): ByteArray {
+    fun sendGetChallenge(): ByteArray {
         val command = NFCISO7816APDU(
             cla = MISO7816.CLA_ISO7816.toInt(),
             ins = MISO7816.INS_GET_CHALLENGE.toInt(),
@@ -47,7 +47,7 @@ class AndroidTagReader(private val tag: Tag) {
         return APDUValidator.checkIsSuccessAndDropSW(response ?: byteArrayOf())
     }
 
-    suspend fun finalize(): Boolean {
+    fun finalize(): Boolean {
         try {
             isoDep?.close()
             return true
@@ -105,15 +105,29 @@ class AndroidTagReader(private val tag: Tag) {
         return response ?: byteArrayOf()
     }
 
-    fun sendSelectFileAndReadDataGroup(dg: DataGroup): ByteArray {
+    fun sendSelectFileAndReadDataGroup(dg: DataGroup): ByteArray? {
         val response = sendSelectFile(dg.value)
-        if (!APDUValidator.isSuccess(response)) return byteArrayOf()
+        println("Response Select File: $response")
+        if (!response) return null
 
         var data: ByteArray = byteArrayOf()
+
+        println("Starting get file info")
+
         val fileInfo: ByteArray = getFileInfo()
+
+        println("Get File Info: ${fileInfo.toHexString()}")
+
         data = data.plus(fileInfo)
         val fileLength = PassportLib.getFileLength(fileInfo)
-        data = data.plus(getFileContent(fileLength))
+
+        println("File Length: $fileLength")
+
+        val fileContent = getFileContent(fileLength)
+
+        println("File Content: ${fileContent.toHexString()}")
+
+        data = data.plus(fileContent)
         return data
     }
 
@@ -181,7 +195,7 @@ class AndroidTagReader(private val tag: Tag) {
         return response.copyOfRange(0, response.size - 2)
     }
 
-    private fun sendSelectFile(fid: Short): ByteArray {
+    private fun sendSelectFile(fid: Short): Boolean {
         val fiddle = byteArrayOf(
             (fid.toInt() shr 8 and 0xFF).toByte(),
             (fid.toInt() and 0xFF).toByte()
@@ -197,13 +211,14 @@ class AndroidTagReader(private val tag: Tag) {
         )
 
         val response = sendWithSecureMessaging(command)
-        return response
+        val responseAPDU = ResponseAPDU.fromByteArray(response)
+        return APDUValidator.isSuccess(responseAPDU)
     }
 
     private fun sendWithSecureMessaging(apdu: AndroidNFCISO7816APDU): ByteArray {
         val message = secureMessaging!!.protect(apdu)
-        val response = isoDep?.transceive(message.toByteArray())
-        return secureMessaging!!.unprotect(response ?: byteArrayOf())
+        val response = isoDep!!.transceive(message.toByteArray())
+        return secureMessaging!!.unprotect(response)
     }
 
     fun sendMSEKAT(keyData: ByteArray, idData: ByteArray?): ResponseAPDU {

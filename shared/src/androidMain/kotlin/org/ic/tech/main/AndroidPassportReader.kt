@@ -12,6 +12,7 @@ import org.ic.tech.main.core.AndroidBacHandler
 import org.ic.tech.main.core.AndroidTagReader
 import org.ic.tech.main.core.ChipAuthenticationHandler
 import org.ic.tech.main.core.DataGroup
+import org.ic.tech.main.core.extensions.isNull
 import org.ic.tech.main.core.extensions.toHexString
 import org.ic.tech.main.models.BacKey
 import org.ic.tech.main.models.ReadIdCardResponse
@@ -118,11 +119,11 @@ class AndroidPassportReader(
         emitStartReading()
 
         val response = tagReader.selectPassportApplication()
-        if (!checkStatusAndEmit(
-                response,
-                ReadIdCardStatus.SelectPassportApplicationSuccess
-            )
-        ) return@flow
+        val checkStatus = checkStatusAndEmit(
+            response,
+            ReadIdCardStatus.SelectPassportApplicationSuccess
+        )
+        if (!checkStatus) return@flow
 
         val bacKey = makeBacKey()
         val responseDoBac = bacHandler.doBACAuthentication(tagReader, bacKey)
@@ -131,7 +132,11 @@ class AndroidPassportReader(
         val dg14: Map<BigInteger, PublicKey> = readDataGroup14() ?: return@flow
         val (key, value) = dg14.entries.iterator().next()
 
+        println("Key: ${value.encoded.toHexString()}")
+
         if (!chipAuthenticationPublicKeyInfos(key, value)) return@flow
+
+        println("Chip Authentication Success")
 
         val mrzInfo = readDataGroup1() ?: return@flow
         val mrzData = collectStateMRZ(mrzInfo)
@@ -187,7 +192,7 @@ class AndroidPassportReader(
 
     private suspend fun FlowCollector<ReadIdCardResponse>.readDataGroup14(): Map<BigInteger, PublicKey>? {
         val data = tagReader.sendSelectFileAndReadDataGroup(dg = DataGroup.DG14)
-        if (data.isEmpty()) {
+        if (data.isNull()) {
             emit(
                 ReadIdCardResponse(
                     status = ReadIdCardStatus.Failed,
@@ -197,13 +202,13 @@ class AndroidPassportReader(
             )
             return null
         }
-        val dg14File = DG14File(data.inputStream())
+        val dg14File = DG14File(data?.inputStream())
         return dg14File.chipAuthenticationPublicKeyInfos
     }
 
     private suspend fun FlowCollector<ReadIdCardResponse>.readDataGroup1(): MRZInfo? {
         val data = tagReader.sendSelectFileAndReadDataGroup(dg = DataGroup.DG1)
-        if (data.isEmpty() || data.size == 2) {
+        if (data.isNull()) {
             emit(
                 ReadIdCardResponse(
                     status = ReadIdCardStatus.Failed,
@@ -213,7 +218,7 @@ class AndroidPassportReader(
             )
             return null
         }
-        val dg1File = DG1File(data.inputStream())
+        val dg1File = DG1File(data?.inputStream())
         return dg1File.mrzInfo
     }
 

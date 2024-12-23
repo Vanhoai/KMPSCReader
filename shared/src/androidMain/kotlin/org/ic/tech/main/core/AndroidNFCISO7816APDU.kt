@@ -3,7 +3,7 @@ package org.ic.tech.main.core;
 import org.ic.tech.main.core.extensions.isNull
 
 // int cla, int ins, int p1, int p2, byte[] data,
-//                        int dataOffset, int dataLength, int ne
+// int dataOffset, int dataLength, int ne
 
 class AndroidNFCISO7816APDU(
     val cla: Int,
