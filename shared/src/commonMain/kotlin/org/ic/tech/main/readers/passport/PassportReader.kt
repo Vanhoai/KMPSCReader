@@ -37,29 +37,23 @@ class PassportReader(
      * format
      */
     fun updateBacKey(bacKey: BacKey): ReadIdCardResponse {
-        if (bacKey.documentNumber.isEmpty()) {
-            return ReadIdCardResponse(
-                status = ReadIdCardStatus.Failed,
-                message = "Document number is empty",
-                data = mapOf()
-            )
-        }
+        if (bacKey.documentNumber.isEmpty()) return ReadIdCardResponse(
+            ReadIdCardStatus.Failed,
+            "Document number is empty"
+        )
 
-        if (bacKey.expireDate.isEmpty()) {
-            return ReadIdCardResponse(
-                status = ReadIdCardStatus.Failed,
-                message = "Expire date is empty",
-                data = mapOf()
-            )
-        }
 
-        if (bacKey.birthDate.isEmpty()) {
-            return ReadIdCardResponse(
-                status = ReadIdCardStatus.Failed,
-                message = "Birth date is empty",
-                data = mapOf()
-            )
-        }
+        if (bacKey.expireDate.isEmpty()) return ReadIdCardResponse(
+            ReadIdCardStatus.Failed,
+            "Expire date is empty"
+        )
+
+
+        if (bacKey.birthDate.isEmpty()) return ReadIdCardResponse(
+            ReadIdCardStatus.Failed,
+            "Birth date is empty"
+        )
+
 
         _passportState.update {
             it.copy(
@@ -69,11 +63,7 @@ class PassportReader(
             )
         }
 
-        return ReadIdCardResponse(
-            status = ReadIdCardStatus.Success,
-            message = "Bac key updated",
-            data = mapOf()
-        )
+        return ReadIdCardResponse(ReadIdCardStatus.Success, "Bac key updated")
     }
 
     /**

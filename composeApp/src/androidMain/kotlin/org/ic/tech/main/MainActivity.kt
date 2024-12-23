@@ -76,6 +76,7 @@ class MainActivity : ComponentActivity() {
             val bacHandler = AndroidBacHandler()
             val chipAuthenticationHandler = ChipAuthenticationHandler()
             val passportReader = AndroidPassportReader(
+                this@MainActivity.application,
                 tagReader,
                 bacHandler,
                 chipAuthenticationHandler

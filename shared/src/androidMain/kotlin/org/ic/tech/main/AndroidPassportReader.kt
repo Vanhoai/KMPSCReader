@@ -1,5 +1,8 @@
 package org.ic.tech.main
 
+import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.annotation.RequiresPermission.Read
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -20,8 +23,12 @@ import org.ic.tech.main.models.ReadIdCardStatus
 import org.ic.tech.main.readers.passport.PassportState
 import org.jmrtd.lds.DG14File
 import org.jmrtd.lds.DG1File
+import org.jmrtd.lds.DG2File
 import org.jmrtd.lds.MRZInfo
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.InputStream
 import java.math.BigInteger
 import java.security.PublicKey
 
@@ -34,6 +41,7 @@ import java.security.PublicKey
  * Class for reading passport id card (CCCD VietNam)
  */
 class AndroidPassportReader(
+    private val application: Application,
     private val tagReader: AndroidTagReader,
     private val bacHandler: AndroidBacHandler,
     private val chipAuthenticationHandler: ChipAuthenticationHandler
@@ -141,7 +149,8 @@ class AndroidPassportReader(
         val mrzInfo = readDataGroup1() ?: return@flow
         val mrzData = collectStateMRZ(mrzInfo)
 
-        println("MRZ Data: $mrzData")
+        val pathImage = readDataGroup2() ?: return@flow
+        println("Image Path: $pathImage")
     }
 
     private fun collectStateMRZ(mrzInfo: MRZInfo): JSONObject {
@@ -206,6 +215,87 @@ class AndroidPassportReader(
         return dg14File.chipAuthenticationPublicKeyInfos
     }
 
+//    val dg2File = MDG2File(data.inputStream())
+//
+//    val faceInfos = dg2File.getFaceInfos()[0]
+//    val faceImageInfos = faceInfos.getSubRecords()[0]
+//
+//    val inputStream: InputStream = faceImageInfos.getImageInputStream() ?: return null
+//    val imageBytes: ByteArray = ImageUtils.getImageBytes(inputStream) ?: return null
+//
+//    val directory = File(application.filesDir, ID_IMAGE_DIRECTORY)
+//    if (directory.exists()) directory.mkdirs()
+//
+//    val file = File(directory, "${System.currentTimeMillis() / 1000}.png")
+//    ImageUtils.writeImageBytesToFile(imageBytes, file.path)
+//    return file.path
+
+    private suspend fun FlowCollector<ReadIdCardResponse>.readDataGroup2(): String? {
+        val data = tagReader.sendSelectFileAndReadDataGroup(dg = DataGroup.DG2)
+        if (data.isNull()) {
+            emit(
+                ReadIdCardResponse(
+                    status = ReadIdCardStatus.Failed,
+                    message = "DataGroup2 is empty ⚠️",
+                    data = mapOf()
+                )
+            )
+            return null
+        }
+
+        val dg2File = DG2File(data?.inputStream())
+        val faceInfos = dg2File.faceInfos[0]
+        val faceImageInfos = faceInfos.faceImageInfos[0]
+
+        val inputStream: InputStream = faceImageInfos.imageInputStream ?: return null
+        val imageBytes: ByteArray = getImageBytes(inputStream) ?: return null
+
+        val directory = File(application.filesDir, ID_IMAGE_DIRECTORY)
+        if (directory.exists()) directory.mkdirs()
+
+        val file = File(directory, "${System.currentTimeMillis() / 1000}.png")
+        writeImageBytesToFile(imageBytes, file.path)
+        return file.path
+    }
+
+    private fun writeImageBytesToFile(imageBytes: ByteArray, path: String): Boolean {
+        val file = File(path)
+        val directory = file.parentFile ?: return false
+        if (!directory.exists()) {
+            directory.mkdirs()
+        }
+        if (!file.exists()) {
+            file.createNewFile()
+        }
+        file.outputStream().use {
+            it.write(imageBytes)
+        }
+        return true
+    }
+
+    private fun getImageBytes(inputStream: InputStream, quality: Int = 100): ByteArray? {
+        val bitmap = getBitmap(inputStream)
+        return if (bitmap != null) {
+            getImageBytes(bitmap, quality)
+        } else {
+            null
+        }
+    }
+
+    private fun getImageBytes(bitmap: Bitmap, quality: Int = 100): ByteArray {
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, quality, byteArrayOutputStream)
+        return byteArrayOutputStream.toByteArray()
+    }
+
+    private fun getBitmap(inputStream: InputStream): Bitmap? {
+        return try {
+            BitmapFactory.decodeStream(inputStream)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private suspend fun FlowCollector<ReadIdCardResponse>.readDataGroup1(): MRZInfo? {
         val data = tagReader.sendSelectFileAndReadDataGroup(dg = DataGroup.DG1)
         if (data.isNull()) {
@@ -251,5 +341,9 @@ class AndroidPassportReader(
 
         emit(response.copy(status = statusExpected))
         return true
+    }
+
+    companion object {
+        private const val ID_IMAGE_DIRECTORY = "id_images"
     }
 }

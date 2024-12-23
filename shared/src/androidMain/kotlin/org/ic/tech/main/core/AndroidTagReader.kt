@@ -107,26 +107,13 @@ class AndroidTagReader(private val tag: Tag) {
 
     fun sendSelectFileAndReadDataGroup(dg: DataGroup): ByteArray? {
         val response = sendSelectFile(dg.value)
-        println("Response Select File: $response")
         if (!response) return null
 
         var data: ByteArray = byteArrayOf()
-
-        println("Starting get file info")
-
         val fileInfo: ByteArray = getFileInfo()
-
-        println("Get File Info: ${fileInfo.toHexString()}")
-
         data = data.plus(fileInfo)
         val fileLength = PassportLib.getFileLength(fileInfo)
-
-        println("File Length: $fileLength")
-
         val fileContent = getFileContent(fileLength)
-
-        println("File Content: ${fileContent.toHexString()}")
-
         data = data.plus(fileContent)
         return data
     }
@@ -216,6 +203,7 @@ class AndroidTagReader(private val tag: Tag) {
     }
 
     private fun sendWithSecureMessaging(apdu: AndroidNFCISO7816APDU): ByteArray {
+        println("Send with Secure Messaging")
         val message = secureMessaging!!.protect(apdu)
         val response = isoDep!!.transceive(message.toByteArray())
         return secureMessaging!!.unprotect(response)

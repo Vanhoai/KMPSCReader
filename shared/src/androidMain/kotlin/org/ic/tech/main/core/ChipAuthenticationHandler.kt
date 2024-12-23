@@ -10,6 +10,8 @@ import java.security.spec.AlgorithmParameterSpec
 import javax.crypto.KeyAgreement
 
 class ChipAuthenticationHandler() {
+    private val sm = SecureMessagingSessionKeyGenerator()
+
     fun doChipAuthentication(
         tagReader: AndroidTagReader,
         key: BigInteger,
@@ -65,6 +67,18 @@ class ChipAuthenticationHandler() {
         }
 
         val resSendMSEKAT = tagReader.sendMSEKAT(keyData, idData)
+
+        val ksEnc = sm.deriveKey(secret, counter = 1)
+        val ksMac = sm.deriveKey(secret, counter = 2)
+        val ssc = 0L
+
+        val secureMessaging = SecureMessaging(
+            ksEnc,
+            ksMac,
+            ssc,
+            SecureMessagingSupportedAlgorithms.DES
+        )
+        tagReader.updateSecureMessaging(secureMessaging)
         return APDUValidator.isSuccess(resSendMSEKAT)
     }
 
