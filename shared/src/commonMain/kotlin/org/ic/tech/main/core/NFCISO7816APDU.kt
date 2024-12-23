@@ -1,7 +1,5 @@
 package org.ic.tech.main.core
 
-import org.ic.tech.main.core.extensions.isNull
-
 class NFCISO7816APDU(
     val cla: Int,
     val ins: Int,
@@ -13,7 +11,7 @@ class NFCISO7816APDU(
     val ne: Int,
 ) {
     var nc: Int? = null
-    var apdu: ByteArray? = null
+    private var apdu: ByteArray? = null
     private var dataOffset: Int? = null
 
     // int cla, int ins, int p1, int p2, int ne
@@ -29,9 +27,25 @@ class NFCISO7816APDU(
         ne
     )
 
+    // int cla, int ins, int p1, int p2, int ne
+    // this(cla, ins, p1, p2, null, 0, 0, ne);
+
+    // int cla, int ins, int p1, int p2, byte[] data
+    // this(cla, ins, p1, p2, data, 0, arrayLength(data), 0);
+    constructor(cla: Int, ins: Int, p1: Int, p2: Int, data: ByteArray) : this(
+        cla,
+        ins,
+        p1,
+        p2,
+        data,
+        0,
+        arrayLength(data),
+        0
+    )
+
     // int cla, int ins, int p1, int p2, byte[] data, int ne
     // this(cla, ins, p1, p2, data, 0, arrayLength(data), ne);
-    constructor(cla: Int, ins: Int, p1: Int, p2: Int, data: ByteArray?, ne: Int) : this(
+    constructor(cla: Int, ins: Int, p1: Int, p2: Int, data: ByteArray, ne: Int) : this(
         cla,
         ins,
         p1,
@@ -93,11 +107,13 @@ class NFCISO7816APDU(
                     apdu!![4] = dataLength.toByte()
                     dataOffset = 5
 
-                    println("Offset Copy: $offset")
-                    println("Data Length: $dataLength")
-                    println("Data Size: ${data!!.size}")
+                    data!!.copyInto(
+                        destination = apdu!!,
+                        destinationOffset = 5,
+                        startIndex = offset,
+                        endIndex = offset + dataLength
+                    )
 
-                    apdu!!.copyInto(apdu!!, 5, offset, offset + dataLength)
                 } else {
                     // case 3e -> extended form data length
                     // -> 4 byte header + 3 byte data length + data
@@ -107,7 +123,13 @@ class NFCISO7816APDU(
                     apdu!![5] = (dataLength shr 8).toByte()
                     apdu!![6] = dataLength.toByte()
                     dataOffset = 7
-                    apdu!!.copyInto(apdu!!, 7, offset, offset + dataLength)
+
+                    data!!.copyInto(
+                        destination = apdu!!,
+                        destinationOffset = 7,
+                        startIndex = offset,
+                        endIndex = offset + dataLength
+                    )
                 }
             } else {
                 // case 4s or 4e
@@ -118,7 +140,14 @@ class NFCISO7816APDU(
                     setHeader(cla, ins, p1, p2)
                     apdu!![4] = dataLength.toByte()
                     dataOffset = 5
-                    apdu!!.copyInto(apdu!!, 5, offset, offset + dataLength)
+
+                    data!!.copyInto(
+                        destination = apdu!!,
+                        destinationOffset = 5,
+                        startIndex = offset,
+                        endIndex = offset + dataLength
+                    )
+
                     apdu!![apdu!!.size - 1] = if ((ne != 256)) ne.toByte() else 0
                 } else {
                     // case 4e -> extended form data length
@@ -129,7 +158,13 @@ class NFCISO7816APDU(
                     apdu!![5] = (dataLength shr 8).toByte()
                     apdu!![6] = dataLength.toByte()
                     dataOffset = 7
-                    apdu!!.copyInto(apdu!!, 7, offset, offset + dataLength)
+                    data!!.copyInto(
+                        destination = apdu!!,
+                        destinationOffset = 7,
+                        startIndex = offset,
+                        endIndex = offset + dataLength
+                    )
+
                     if (ne != 65536) {
                         val leOfs: Int = apdu!!.size - 2
                         apdu!![leOfs] = (ne shr 8).toByte()
@@ -147,12 +182,12 @@ class NFCISO7816APDU(
             throw IllegalArgumentException("Offset and length must not be negative")
         }
 
-        if (bytes.isNull()) {
+        if (bytes == null) {
             if ((ofs != 0) && (len != 0)) {
                 throw IllegalArgumentException("offset and length must be 0 if array is null")
             }
         } else {
-            if (ofs > bytes!!.size - len) {
+            if (ofs > bytes.size - len) {
                 throw IllegalArgumentException("Offset plus length exceed array size")
             }
         }
@@ -168,7 +203,7 @@ class NFCISO7816APDU(
     companion object {
         private const val MAX_APDU_SIZE = 65544
         private fun arrayLength(b: ByteArray?): Int {
-            return if (b.isNull()) 0 else b!!.size
+            return b?.size ?: 0
         }
     }
 }

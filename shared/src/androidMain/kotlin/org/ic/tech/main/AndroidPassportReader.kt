@@ -3,7 +3,6 @@ package org.ic.tech.main
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import androidx.annotation.RequiresPermission.Read
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,8 +14,6 @@ import org.ic.tech.main.core.AndroidBacHandler
 import org.ic.tech.main.core.AndroidTagReader
 import org.ic.tech.main.core.ChipAuthenticationHandler
 import org.ic.tech.main.core.DataGroup
-import org.ic.tech.main.core.extensions.isNull
-import org.ic.tech.main.core.extensions.toHexString
 import org.ic.tech.main.models.BacKey
 import org.ic.tech.main.models.ReadIdCardResponse
 import org.ic.tech.main.models.ReadIdCardStatus
@@ -25,7 +22,6 @@ import org.jmrtd.lds.DG14File
 import org.jmrtd.lds.DG1File
 import org.jmrtd.lds.DG2File
 import org.jmrtd.lds.MRZInfo
-import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
@@ -126,7 +122,7 @@ class AndroidPassportReader(
         if (!checkStatusAndEmit(initResponse, ReadIdCardStatus.InitializeSuccess)) return@flow
         emitStartReading()
 
-        val response = tagReader.selectPassportApplication()
+        val response = tagReader.selectPassportApplication() // chose application run
         val checkStatus = checkStatusAndEmit(
             response,
             ReadIdCardStatus.SelectPassportApplicationSuccess
@@ -134,31 +130,37 @@ class AndroidPassportReader(
         if (!checkStatus) return@flow
 
         val bacKey = makeBacKey()
-        val responseDoBac = bacHandler.doBACAuthentication(tagReader, bacKey)
+        val responseDoBac =
+            bacHandler.doBACAuthentication(tagReader, bacKey) // Machine Readable Zone
         if (!checkStatusAndEmit(responseDoBac, ReadIdCardStatus.PerformBacSuccess)) return@flow
 
         val dg14: Map<BigInteger, PublicKey> = readDataGroup14() ?: return@flow
         val (key, value) = dg14.entries.iterator().next()
 
-        println("Key: ${value.encoded.toHexString()}")
-
         if (!chipAuthenticationPublicKeyInfos(key, value)) return@flow
-
-        println("Chip Authentication Success")
-
         val mrzInfo = readDataGroup1() ?: return@flow
         val mrzData = collectStateMRZ(mrzInfo)
 
-        val pathImage = readDataGroup2() ?: return@flow
-        println("Image Path: $pathImage")
+        val facePath = readDataGroup2() ?: return@flow
+        mrzData["face"] = facePath
+
+        emit(
+            ReadIdCardResponse(
+                status = ReadIdCardStatus.Success,
+                message = "Passport id card read success",
+                data = mrzData.toMap()
+            )
+        )
     }
 
-    private fun collectStateMRZ(mrzInfo: MRZInfo): JSONObject {
-        val data = JSONObject()
-        data.put("personalNumber", mrzInfo.personalNumber)
-        data.put("documentType", mrzInfo.documentType)
-        data.put("documentCode", mrzInfo.documentCode)
-        data.put("documentNumber", mrzInfo.documentNumber)
+    private fun collectStateMRZ(mrzInfo: MRZInfo): MutableMap<String, Any> {
+        val mrzData = mutableMapOf<String, Any>()
+
+        mrzData["personalNumber"] = mrzInfo.personalNumber
+        mrzData["documentType"] = mrzInfo.documentType
+        mrzData["documentCode"] = mrzInfo.documentCode
+        mrzData["documentNumber"] = mrzInfo.documentNumber
+
         var name = mrzInfo.primaryIdentifier + " "
 
         val components: Array<String> = mrzInfo.secondaryIdentifierComponents
@@ -168,14 +170,14 @@ class AndroidPassportReader(
             )
         }
 
-        data.put("name", name)
-        data.put("dateOfBirth", mrzInfo.dateOfBirth)
-        data.put("dateOfExpiry", mrzInfo.dateOfExpiry)
-        data.put("gender", mrzInfo.gender)
-        data.put("nationality", mrzInfo.nationality)
-        data.put("issuingState", mrzInfo.issuingState)
+        mrzData["name"] = name
+        mrzData["dateOfBirth"] = mrzInfo.dateOfBirth
+        mrzData["dateOfExpiry"] = mrzInfo.dateOfExpiry
+        mrzData["gender"] = mrzInfo.gender
+        mrzData["nationality"] = mrzInfo.nationality
+        mrzData["issuingState"] = mrzInfo.issuingState
 
-        return data
+        return mrzData
     }
 
     private suspend fun FlowCollector<ReadIdCardResponse>.chipAuthenticationPublicKeyInfos(
@@ -201,7 +203,7 @@ class AndroidPassportReader(
 
     private suspend fun FlowCollector<ReadIdCardResponse>.readDataGroup14(): Map<BigInteger, PublicKey>? {
         val data = tagReader.sendSelectFileAndReadDataGroup(dg = DataGroup.DG14)
-        if (data.isNull()) {
+        if (data == null) {
             emit(
                 ReadIdCardResponse(
                     status = ReadIdCardStatus.Failed,
@@ -211,7 +213,7 @@ class AndroidPassportReader(
             )
             return null
         }
-        val dg14File = DG14File(data?.inputStream())
+        val dg14File = DG14File(data.inputStream())
         return dg14File.chipAuthenticationPublicKeyInfos
     }
 
@@ -232,7 +234,7 @@ class AndroidPassportReader(
 
     private suspend fun FlowCollector<ReadIdCardResponse>.readDataGroup2(): String? {
         val data = tagReader.sendSelectFileAndReadDataGroup(dg = DataGroup.DG2)
-        if (data.isNull()) {
+        if (data == null) {
             emit(
                 ReadIdCardResponse(
                     status = ReadIdCardStatus.Failed,
@@ -243,7 +245,7 @@ class AndroidPassportReader(
             return null
         }
 
-        val dg2File = DG2File(data?.inputStream())
+        val dg2File = DG2File(data.inputStream())
         val faceInfos = dg2File.faceInfos[0]
         val faceImageInfos = faceInfos.faceImageInfos[0]
 
@@ -298,7 +300,7 @@ class AndroidPassportReader(
 
     private suspend fun FlowCollector<ReadIdCardResponse>.readDataGroup1(): MRZInfo? {
         val data = tagReader.sendSelectFileAndReadDataGroup(dg = DataGroup.DG1)
-        if (data.isNull()) {
+        if (data == null) {
             emit(
                 ReadIdCardResponse(
                     status = ReadIdCardStatus.Failed,
@@ -308,7 +310,7 @@ class AndroidPassportReader(
             )
             return null
         }
-        val dg1File = DG1File(data?.inputStream())
+        val dg1File = DG1File(data.inputStream())
         return dg1File.mrzInfo
     }
 

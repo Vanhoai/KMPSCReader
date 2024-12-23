@@ -1,7 +1,6 @@
 package org.ic.tech.main.core
 
 import net.sf.scuba.tlv.TLVInputStream
-import org.ic.tech.main.core.extensions.isNotNull
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -75,7 +74,7 @@ object PassportLib {
         return res
     }
 
-    fun buildD097(apdu: AndroidNFCISO7816APDU): ByteArray {
+    fun buildD097(apdu: NFCISO7816APDU): ByteArray {
         val do97 = ByteArray(0)
         val isMSE = apdu.ins == 0x22
         if (apdu.ne > 0 && (if (isMSE) apdu.ne < 256 else true)) {
@@ -117,7 +116,7 @@ object PassportLib {
         return n
     }
 
-    fun maskAndPad(apdu: AndroidNFCISO7816APDU, padLength: Int): ByteArray {
+    fun maskAndPad(apdu: NFCISO7816APDU, padLength: Int): ByteArray {
         val bytes = byteArrayOf(
             (apdu.cla or 0x0C.toByte().toInt()).toByte(),
             apdu.ins.toByte(),
@@ -129,14 +128,14 @@ object PassportLib {
     }
 
     fun buildDO8587(
-        apdu: AndroidNFCISO7816APDU,
+        apdu: NFCISO7816APDU,
         padLength: Int,
         ksEnc: SecretKey,
         sm: AndroidSecureMessaging,
     ): ByteArray {
         val do8587 = ByteArray(0)
 
-        if (apdu.nc.isNotNull() && apdu.nc!! > 0) {
+        if (apdu.nc != null && apdu.nc!! > 0) {
             // Build DO8587 command if command data length is greater than zero
             val has85 = apdu.ins == 0xB1
             val data = padWithMRZ(apdu.data!!, blockSize = padLength)

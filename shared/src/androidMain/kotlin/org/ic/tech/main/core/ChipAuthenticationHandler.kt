@@ -41,6 +41,7 @@ class ChipAuthenticationHandler() {
         val agreement = KeyAgreement.getInstance(agreementAlg)
         agreement.init(keyPair.private)
         agreement.doPhase(publicKey, true)
+        
         val secret = agreement.generateSecret()
 
         var keyData: ByteArray? = null

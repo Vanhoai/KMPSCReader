@@ -2,7 +2,6 @@ package org.ic.tech.main.core
 
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
-import org.ic.tech.main.core.extensions.toHexString
 import org.ic.tech.main.models.ReadIdCardResponse
 import org.ic.tech.main.models.ReadIdCardStatus
 
@@ -39,7 +38,6 @@ class AndroidTagReader(private val tag: Tag) {
             ins = MISO7816.INS_GET_CHALLENGE.toInt(),
             p1 = 0x00,
             p2 = 0x00,
-            data = null,
             ne = 8
         )
 
@@ -88,7 +86,7 @@ class AndroidTagReader(private val tag: Tag) {
             0x01.toByte() // 0x01
         )
 
-        val command = AndroidNFCISO7816APDU(
+        val command = NFCISO7816APDU(
             cla = 0x00,
             ins = 0xA4,
             p1 = 0x04,
@@ -100,7 +98,7 @@ class AndroidTagReader(private val tag: Tag) {
         return APDUValidator.parseResponse(response ?: byteArrayOf())
     }
 
-    fun send(cmd: AndroidNFCISO7816APDU): ByteArray {
+    fun send(cmd: NFCISO7816APDU): ByteArray {
         val response = isoDep?.transceive(cmd.toByteArray())
         return response ?: byteArrayOf()
     }
@@ -140,7 +138,7 @@ class AndroidTagReader(private val tag: Tag) {
         isExtendedLength: Boolean = false
     ): ByteArray? {
         var mutableLe = le
-        var commandAPDU: AndroidNFCISO7816APDU? = null
+        var commandAPDU: NFCISO7816APDU? = null
         if (mutableLe == 0) return null
         // In the case of long read 2/3 less bytes of the actual data will be returned,
         // because a tag and length will be sent along, here we need to account for this
@@ -160,7 +158,7 @@ class AndroidTagReader(private val tag: Tag) {
 
         commandAPDU = if (isExtendedLength) {
             val data = byteArrayOf(0x54, 0x02, offsetHi, offsetLo)
-            AndroidNFCISO7816APDU(
+            NFCISO7816APDU(
                 MISO7816.CLA_ISO7816.toInt(),
                 MISO7816.INS_READ_BINARY2.toInt(),
                 0,
@@ -169,7 +167,7 @@ class AndroidTagReader(private val tag: Tag) {
                 mutableLe
             )
         } else {
-            AndroidNFCISO7816APDU(
+            NFCISO7816APDU(
                 MISO7816.CLA_ISO7816.toInt(),
                 MISO7816.INS_READ_BINARY.toInt(),
                 offsetHi.toInt(),
@@ -188,7 +186,7 @@ class AndroidTagReader(private val tag: Tag) {
             (fid.toInt() and 0xFF).toByte()
         )
 
-        val command = AndroidNFCISO7816APDU(
+        val command = NFCISO7816APDU(
             0x00.toByte().toInt(),
             0xA4.toByte().toInt(),
             0x02.toByte().toInt(),
@@ -202,11 +200,11 @@ class AndroidTagReader(private val tag: Tag) {
         return APDUValidator.isSuccess(responseAPDU)
     }
 
-    private fun sendWithSecureMessaging(apdu: AndroidNFCISO7816APDU): ByteArray {
-        println("Send with Secure Messaging")
+    private fun sendWithSecureMessaging(apdu: NFCISO7816APDU): ByteArray {
         val message = secureMessaging!!.protect(apdu)
         val response = isoDep!!.transceive(message.toByteArray())
-        return secureMessaging!!.unprotect(response)
+        val unprotect = secureMessaging!!.unprotect(response)
+        return unprotect
     }
 
     fun sendMSEKAT(keyData: ByteArray, idData: ByteArray?): ResponseAPDU {
@@ -215,7 +213,7 @@ class AndroidTagReader(private val tag: Tag) {
 
         if (idData != null) System.arraycopy(idData, 0, data, keyData.size, idData.size)
 
-        val commandAPDU = AndroidNFCISO7816APDU(
+        val commandAPDU = NFCISO7816APDU(
             MISO7816.CLA_ISO7816.toInt(),
             MISO7816.INS_MSE.toInt(),
             0x41,

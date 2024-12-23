@@ -1,6 +1,7 @@
 package org.ic.tech.main
 
 import platform.UIKit.UIDevice
+import platform.CoreNFC.NFCISO7816TagProtocol
 
 class IOSPlatform : Platform {
     override val name: String =

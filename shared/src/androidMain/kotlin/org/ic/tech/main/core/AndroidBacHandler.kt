@@ -152,7 +152,7 @@ class AndroidBacHandler {
         System.arraycopy(signature, 0, data, 32, 8)
         val le = 40 // Response length
 
-        val command = AndroidNFCISO7816APDU(
+        val command = NFCISO7816APDU(
             cla = MISO7816.CLA_ISO7816.toInt(),
             ins = MISO7816.INS_EXTERNAL_AUTHENTICATE.toInt(),
             p1 = p1.toInt(),

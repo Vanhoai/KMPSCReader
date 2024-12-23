@@ -1,6 +1,5 @@
 package org.ic.tech.main.core
 
-import org.ic.tech.main.core.extensions.toHexString
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -9,6 +8,13 @@ import java.io.IOException
 import java.security.GeneralSecurityException
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
+
+/**
+ * Integrated circuit -> Chip ID Card
+ * NFC -> Near Field Communication
+ *
+ * ID Card -> Multi Tech (Iso Dep, NfcA) -> *Iso Dep
+ */
 
 /**
  * SecureMessaging class is responsible for handling Secure Messaging operations.
@@ -56,7 +62,7 @@ class SecureMessaging(
      * 8. Return new protected APDU
      */
     @Throws(GeneralSecurityException::class, IOException::class)
-    fun protect(apdu: AndroidNFCISO7816APDU): AndroidNFCISO7816APDU {
+    fun protect(apdu: NFCISO7816APDU): NFCISO7816APDU {
         incrementSCC()
         val masked = PassportLib.maskAndPad(apdu, padLength)
         val do97 = PassportLib.buildD097(apdu = apdu)
@@ -68,7 +74,7 @@ class SecureMessaging(
         val do8E = PassportLib.build8E(mac)
 
         val dataToSend = do8587 + do97 + do8E
-        val newApdu = AndroidNFCISO7816APDU(
+        val newApdu = NFCISO7816APDU(
             masked[0].toInt(),
             masked[1].toInt(),
             masked[2].toInt(),
