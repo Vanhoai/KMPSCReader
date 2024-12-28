@@ -6,14 +6,13 @@ import android.graphics.BitmapFactory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import org.ic.tech.main.core.AndroidBacHandler
 import org.ic.tech.main.core.AndroidTagReader
 import org.ic.tech.main.core.ChipAuthenticationHandler
 import org.ic.tech.main.core.DataGroup
+import org.ic.tech.main.core.MRZResponse
 import org.ic.tech.main.models.BacKey
 import org.ic.tech.main.models.ReadIdCardResponse
 import org.ic.tech.main.models.ReadIdCardStatus
@@ -43,7 +42,6 @@ class AndroidPassportReader(
     private val chipAuthenticationHandler: ChipAuthenticationHandler
 ) {
     private val _passportState = MutableStateFlow(PassportState())
-    private val passportState: StateFlow<PassportState> = _passportState.asStateFlow()
 
     /**
      * Update Bac Key
@@ -101,7 +99,7 @@ class AndroidPassportReader(
      * Function prepare to read passport id card
      * and return response if success or not.
      */
-    private suspend fun prepareReadIdCard(): ReadIdCardResponse {
+    private fun prepareReadIdCard(): ReadIdCardResponse {
         val response = tagReader.initialize()
         return response
     }
@@ -142,27 +140,19 @@ class AndroidPassportReader(
         val mrzData = collectStateMRZ(mrzInfo)
 
         val facePath = readDataGroup2() ?: return@flow
-        mrzData["face"] = facePath
+        mrzData.updateFacePath(facePath)
 
         emit(
             ReadIdCardResponse(
                 status = ReadIdCardStatus.Success,
                 message = "Passport id card read success",
-                data = mrzData.toMap()
+                data = mrzData.toMap()!!
             )
         )
     }
 
-    private fun collectStateMRZ(mrzInfo: MRZInfo): MutableMap<String, Any> {
-        val mrzData = mutableMapOf<String, Any>()
-
-        mrzData["personalNumber"] = mrzInfo.personalNumber
-        mrzData["documentType"] = mrzInfo.documentType
-        mrzData["documentCode"] = mrzInfo.documentCode
-        mrzData["documentNumber"] = mrzInfo.documentNumber
-
+    private fun collectStateMRZ(mrzInfo: MRZInfo): MRZResponse {
         var name = mrzInfo.primaryIdentifier + " "
-
         val components: Array<String> = mrzInfo.secondaryIdentifierComponents
         for (i in components.indices) {
             name = name.plus(
@@ -170,14 +160,21 @@ class AndroidPassportReader(
             )
         }
 
-        mrzData["name"] = name
-        mrzData["dateOfBirth"] = mrzInfo.dateOfBirth
-        mrzData["dateOfExpiry"] = mrzInfo.dateOfExpiry
-        mrzData["gender"] = mrzInfo.gender
-        mrzData["nationality"] = mrzInfo.nationality
-        mrzData["issuingState"] = mrzInfo.issuingState
+        val mrzResponse = MRZResponse(
+            personalNumber = mrzInfo.personalNumber,
+            documentType = mrzInfo.documentType,
+            documentCode = mrzInfo.documentCode,
+            documentNumber = mrzInfo.documentNumber,
+            name = name,
+            dateOfBirth = mrzInfo.dateOfBirth,
+            dateOfExpiry = mrzInfo.dateOfExpiry,
+            gender = mrzInfo.gender.name,
+            nationality = mrzInfo.nationality,
+            issuingState = mrzInfo.issuingState,
+            facePath = null
+        )
 
-        return mrzData
+        return mrzResponse
     }
 
     private suspend fun FlowCollector<ReadIdCardResponse>.chipAuthenticationPublicKeyInfos(
