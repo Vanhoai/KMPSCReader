@@ -10,7 +10,6 @@ import android.graphics.BitmapFactory
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
-import android.util.Log
 import android.widget.Toast
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -42,12 +41,10 @@ import java.security.Security
  *
  * Class for reading passport id card (CCCD VietNam)
  */
-class AndroidPassportReader(
-    private val context: Context
-) {
-
+class AndroidPassportReader(private val context: Context) {
     private val nfcAdapter by lazy { NfcAdapter.getDefaultAdapter(context) }
 
+    private var facePathStorage: String? = null
     private lateinit var tagReader: AndroidTagReader
     private lateinit var bacHandler: AndroidBacHandler
     private lateinit var chipAuthenticationHandler: ChipAuthenticationHandler
@@ -63,10 +60,10 @@ class AndroidPassportReader(
     fun startListeningForegroundDispatch(
         activity: Activity,
         clazz: Class<*>, // this class will receive the intent with onNewIntent
-    ) {
+    ): Boolean {
         if (nfcAdapter == null) {
             Toast.makeText(context, "NFC is not available !!!", Toast.LENGTH_SHORT).show()
-            return
+            return false
         }
 
         val intent = Intent(activity, clazz).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -79,13 +76,19 @@ class AndroidPassportReader(
             IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED)
         )
         nfcAdapter?.enableForegroundDispatch(activity, pendingIntent, filters, techList)
+        return true
     }
 
-    fun disableForegroundDispatch(activity: Activity) {
+    fun disableForegroundDispatch(activity: Activity): Boolean {
+        if (nfcAdapter == null) return false
         nfcAdapter?.disableForegroundDispatch(activity)
+        return true
     }
-    
-    private suspend fun FlowCollector<ReadIdCardResponse>.validateBacKey(bacKey: BacKey): Boolean {
+
+    private suspend fun FlowCollector<ReadIdCardResponse>.validatePayload(
+        bacKey: BacKey,
+        facePathStorage: String
+    ): Boolean {
         if (bacKey.documentNumber.isEmpty()) {
             emit(
                 ReadIdCardResponse(
@@ -113,6 +116,17 @@ class AndroidPassportReader(
                 ReadIdCardResponse(
                     status = ReadIdCardStatus.Failed,
                     message = "Birth date is empty",
+                    data = mapOf()
+                )
+            )
+            return false
+        }
+
+        if (facePathStorage.isEmpty()) {
+            emit(
+                ReadIdCardResponse(
+                    status = ReadIdCardStatus.Failed,
+                    message = "Please provide a path for storage face image",
                     data = mapOf()
                 )
             )
@@ -149,8 +163,12 @@ class AndroidPassportReader(
      * 1. Initialize the tag reader
      * 2. Select passport application
      */
-    fun startReadIdCard(tag: Tag, bacKey: BacKey): Flow<ReadIdCardResponse> = flow {
-        if (!validateBacKey(bacKey)) return@flow
+    fun startReadIdCard(
+        tag: Tag,
+        bacKey: BacKey,
+        facePathStorage: String,
+    ): Flow<ReadIdCardResponse> = flow {
+        if (!validatePayload(bacKey, facePathStorage)) return@flow
         try {
             val initResponse = prepareReadIdCard(tag)
             if (!checkStatusAndEmit(initResponse, ReadIdCardStatus.InitializeSuccess)) return@flow
@@ -295,7 +313,7 @@ class AndroidPassportReader(
         val inputStream: InputStream = faceImageInfos.imageInputStream ?: return null
         val imageBytes: ByteArray = getImageBytes(inputStream) ?: return null
 
-        val directory = File(context.filesDir, ID_IMAGE_DIRECTORY)
+        val directory = File(context.filesDir, facePathStorage!!)
         if (directory.exists()) directory.mkdirs()
 
         val file = File(directory, "${System.currentTimeMillis() / 1000}.png")
@@ -381,7 +399,6 @@ class AndroidPassportReader(
     }
 
     companion object {
-        private const val ID_IMAGE_DIRECTORY = "id_images"
         private const val BOUNCY_CASTLE_PROVIDER_POSITION = 1
     }
 }
