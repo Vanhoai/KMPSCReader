@@ -1,4 +1,4 @@
-package org.ic.tech.main.core
+package org.ic.tech.main.core.models.apdu
 
 object MISO7816 {
     const val OFFSET_CLA: Byte = 0.toByte()

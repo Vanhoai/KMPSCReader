@@ -1,7 +1,8 @@
-package org.ic.tech.main.core
+package org.ic.tech.main.core.helpers
 
-import org.ic.tech.main.models.ReadIdCardResponse
-import org.ic.tech.main.models.ReadIdCardStatus
+import org.ic.tech.main.core.models.apdu.RNFCISO7816APDU
+import org.ic.tech.main.core.models.common.ReadIdCardResponse
+import org.ic.tech.main.core.models.common.ReadIdCardStatus
 
 object APDUValidator {
 
@@ -121,7 +122,7 @@ object APDUValidator {
         return sw1 == 0x90.toUByte() && sw2 == 0x00.toUByte()
     }
 
-    fun isSuccess(response: ResponseAPDU): Boolean {
+    fun isSuccess(response: RNFCISO7816APDU): Boolean {
         return isSuccess(response.sw1.toUByte(), response.sw2.toUByte())
     }
 

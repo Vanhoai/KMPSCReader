@@ -1,6 +1,7 @@
-package org.ic.tech.main.core
+package org.ic.tech.main.core.helpers
 
 import net.sf.scuba.tlv.TLVInputStream
+import org.ic.tech.main.core.models.apdu.NFCISO7816APDU
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -112,7 +113,7 @@ object PassportLib {
         dos.writeLong(ssc)
         dos.write(m)
         dos.flush()
-        val n = PassportLib.padWithMRZ(ous.toByteArray())
+        val n = padWithMRZ(ous.toByteArray())
         return n
     }
 
@@ -131,7 +132,7 @@ object PassportLib {
         apdu: NFCISO7816APDU,
         padLength: Int,
         ksEnc: SecretKey,
-        sm: AndroidSecureMessaging,
+        sm: AndroidCrypto,
     ): ByteArray {
         val do8587 = ByteArray(0)
 

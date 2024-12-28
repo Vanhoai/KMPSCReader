@@ -1,11 +1,18 @@
-package org.ic.tech.main.core
+package org.ic.tech.main
 
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
-import org.ic.tech.main.models.ReadIdCardResponse
-import org.ic.tech.main.models.ReadIdCardStatus
+import org.ic.tech.main.core.helpers.APDUValidator
+import org.ic.tech.main.core.models.apdu.DataGroup
+import org.ic.tech.main.core.models.apdu.MISO7816
+import org.ic.tech.main.core.models.apdu.NFCISO7816APDU
+import org.ic.tech.main.core.helpers.PassportLib
+import org.ic.tech.main.core.models.apdu.RNFCISO7816APDU
+import org.ic.tech.main.core.helpers.SecureMessaging
+import org.ic.tech.main.core.models.common.ReadIdCardResponse
+import org.ic.tech.main.core.models.common.ReadIdCardStatus
 
-class AndroidTagReader(private val tag: Tag) {
+class AndroidTagReader {
 
     private var isoDep: IsoDep? = null
     private var secureMessaging: SecureMessaging? = null
@@ -14,7 +21,7 @@ class AndroidTagReader(private val tag: Tag) {
         this.secureMessaging = secureMessaging
     }
 
-    fun initialize(): ReadIdCardResponse {
+    fun initialize(tag: Tag): ReadIdCardResponse {
         try {
             isoDep = IsoDep.get(tag)
             isoDep?.connect()
@@ -87,8 +94,8 @@ class AndroidTagReader(private val tag: Tag) {
         )
 
         val command = NFCISO7816APDU(
-            cla = 0x00,
-            ins = 0xA4,
+            cla = MISO7816.CLA_ISO7816.toInt(),
+            ins = MISO7816.INS_SELECT.toInt(),
             p1 = 0x04,
             p2 = 0x00,
             data = data,
@@ -187,8 +194,8 @@ class AndroidTagReader(private val tag: Tag) {
         )
 
         val command = NFCISO7816APDU(
-            0x00.toByte().toInt(),
-            0xA4.toByte().toInt(),
+            MISO7816.CLA_ISO7816.toInt(),
+            MISO7816.INS_SELECT.toInt(),
             0x02.toByte().toInt(),
             0x0c.toByte().toInt(),
             fiddle,
@@ -196,8 +203,8 @@ class AndroidTagReader(private val tag: Tag) {
         )
 
         val response = sendWithSecureMessaging(command)
-        val responseAPDU = ResponseAPDU.fromByteArray(response)
-        return APDUValidator.isSuccess(responseAPDU)
+        val RNFCISO7816APDU = RNFCISO7816APDU.fromByteArray(response)
+        return APDUValidator.isSuccess(RNFCISO7816APDU)
     }
 
     private fun sendWithSecureMessaging(apdu: NFCISO7816APDU): ByteArray {
@@ -207,7 +214,7 @@ class AndroidTagReader(private val tag: Tag) {
         return unprotect
     }
 
-    fun sendMSEKAT(keyData: ByteArray, idData: ByteArray?): ResponseAPDU {
+    fun sendMSEKAT(keyData: ByteArray, idData: ByteArray?): RNFCISO7816APDU {
         val data = ByteArray(keyData.size + (idData?.size ?: 0))
         System.arraycopy(keyData, 0, data, 0, keyData.size)
 
@@ -222,7 +229,7 @@ class AndroidTagReader(private val tag: Tag) {
         )
 
         val response = sendWithSecureMessaging(commandAPDU)
-        return ResponseAPDU(response)
+        return RNFCISO7816APDU(response)
     }
 
     companion object {

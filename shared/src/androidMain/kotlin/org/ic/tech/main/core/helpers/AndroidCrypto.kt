@@ -1,4 +1,4 @@
-package org.ic.tech.main.core
+package org.ic.tech.main.core.helpers
 
 import android.annotation.SuppressLint
 import android.security.keystore.KeyProperties
@@ -7,7 +7,7 @@ import javax.crypto.Mac
 import javax.crypto.SecretKey
 import javax.crypto.spec.IvParameterSpec
 
-class AndroidSecureMessaging {
+class AndroidCrypto {
     private fun initializeMac(kMac: SecretKey): Mac {
         val mac = Mac.getInstance(MAC_ALGORITHM)
         mac.init(kMac)

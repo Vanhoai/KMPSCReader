@@ -7,6 +7,7 @@ import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
@@ -14,52 +15,35 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.ic.tech.main.core.AndroidBacHandler
-import org.ic.tech.main.core.AndroidTagReader
-import org.ic.tech.main.core.ChipAuthenticationHandler
-import org.ic.tech.main.models.BacKey
-import org.ic.tech.main.models.ReadIdCardStatus
-import org.ic.tech.main.readers.passport.PassportReader
+import org.ic.tech.main.core.handlers.AndroidBacHandler
+import org.ic.tech.main.core.handlers.ChipAuthenticationHandler
+import org.ic.tech.main.core.models.common.BacKey
+import org.ic.tech.main.core.models.common.ReadIdCardStatus
 import org.spongycastle.jce.provider.BouncyCastleProvider
 import java.security.Security
 
 class MainActivity : ComponentActivity() {
 
-    private val nfcAdapter by lazy { NfcAdapter.getDefaultAdapter(this) }
+    private lateinit var passportReader: AndroidPassportReader
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        passportReader = AndroidPassportReader(this@MainActivity)
         setContent {
             App()
         }
-
-        if (nfcAdapter == null) {
-            finish()
-        }
-
-        Security.insertProviderAt(BouncyCastleProvider(), BOUNCY_CASTLE_PROVIDER_POSITION)
     }
 
     override fun onResume() {
         super.onResume()
-        startNfcListening()
-    }
-
-    private fun startNfcListening() {
-        val intent = Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_MUTABLE)
-        val techList = arrayOf(arrayOf(IsoDep::class.java.name))
-        val filters = arrayOf(
-            IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED),
-            IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED),
-            IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED)
-        )
-        nfcAdapter?.enableForegroundDispatch(this, pendingIntent, filters, techList)
+        Log.d("MainActivity", "onResume with passportReader: $passportReader")
+        passportReader.startListeningForegroundDispatch(this, MainActivity::class.java)
     }
 
     override fun onPause() {
         super.onPause()
-        nfcAdapter?.disableForegroundDispatch(this)
+        Log.d("MainActivity", "onPause with passportReader: $passportReader")
+        passportReader.disableForegroundDispatch(this@MainActivity)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -72,41 +56,14 @@ class MainActivity : ComponentActivity() {
 
     private fun startPassportReader(tag: Tag) {
         lifecycleScope.launch(Dispatchers.IO) {
-            val tagReader = AndroidTagReader(tag)
-            val bacHandler = AndroidBacHandler()
-            val chipAuthenticationHandler = ChipAuthenticationHandler()
-            val passportReader = AndroidPassportReader(
-                this@MainActivity.application,
-                tagReader,
-                bacHandler,
-                chipAuthenticationHandler
+            val bacKey = BacKey(
+                documentNumber = "203014513",
+                expireDate = "281224",
+                birthDate = "031224"
             )
-            val updateBacKeyResponse = passportReader.updateBacKey(
-                BacKey(
-                    documentNumber = "203014513",
-                    expireDate = "281224",
-                    birthDate = "031224"
-                )
-            )
-
-            if (updateBacKeyResponse.status == ReadIdCardStatus.Failed) {
-                println("Update BAC key failed: ${updateBacKeyResponse.message}")
-                return@launch
-            }
-
-            passportReader.startReadIdCard().collect { response ->
+            passportReader.startReadIdCard(tag, bacKey).collect { response ->
                 println("Response: $response")
             }
         }
     }
-
-    companion object {
-        const val BOUNCY_CASTLE_PROVIDER_POSITION = 1
-    }
-}
-
-@Preview
-@Composable
-fun AppAndroidPreview() {
-    App()
 }

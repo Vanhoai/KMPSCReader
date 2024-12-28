@@ -1,4 +1,4 @@
-package org.ic.tech.main.core
+package org.ic.tech.main.core.models.apdu
 
 enum class DataGroup(val value: Short) {
     DG1(0x0101),

@@ -1,31 +1,38 @@
 package org.ic.tech.main
 
-import android.app.Application
+import android.app.Activity
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.nfc.NfcAdapter
+import android.nfc.Tag
+import android.nfc.tech.IsoDep
+import android.util.Log
+import android.widget.Toast
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.update
-import org.ic.tech.main.core.AndroidBacHandler
-import org.ic.tech.main.core.AndroidTagReader
-import org.ic.tech.main.core.ChipAuthenticationHandler
-import org.ic.tech.main.core.DataGroup
-import org.ic.tech.main.core.MRZResponse
-import org.ic.tech.main.models.BacKey
-import org.ic.tech.main.models.ReadIdCardResponse
-import org.ic.tech.main.models.ReadIdCardStatus
-import org.ic.tech.main.readers.passport.PassportState
+import org.ic.tech.main.core.handlers.AndroidBacHandler
+import org.ic.tech.main.core.handlers.ChipAuthenticationHandler
+import org.ic.tech.main.core.models.apdu.DataGroup
+import org.ic.tech.main.core.models.common.MRZResponse
+import org.ic.tech.main.core.models.common.BacKey
+import org.ic.tech.main.core.models.common.ReadIdCardResponse
+import org.ic.tech.main.core.models.common.ReadIdCardStatus
 import org.jmrtd.lds.DG14File
 import org.jmrtd.lds.DG1File
 import org.jmrtd.lds.DG2File
 import org.jmrtd.lds.MRZInfo
+import org.spongycastle.jce.provider.BouncyCastleProvider
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.math.BigInteger
 import java.security.PublicKey
+import java.security.Security
 
 /**
  * @name PassportReader
@@ -36,60 +43,83 @@ import java.security.PublicKey
  * Class for reading passport id card (CCCD VietNam)
  */
 class AndroidPassportReader(
-    private val application: Application,
-    private val tagReader: AndroidTagReader,
-    private val bacHandler: AndroidBacHandler,
-    private val chipAuthenticationHandler: ChipAuthenticationHandler
+    private val context: Context
 ) {
-    private val _passportState = MutableStateFlow(PassportState())
 
-    /**
-     * Update Bac Key
-     * @param bacKey BacKeyModel
-     * @return Boolean
-     *
-     * Function update bac key for progress reading passport id card
-     * and return response if one of the field is empty or not expected
-     * format
-     */
-    fun updateBacKey(bacKey: BacKey): ReadIdCardResponse {
+    private val nfcAdapter by lazy { NfcAdapter.getDefaultAdapter(context) }
+
+    private lateinit var tagReader: AndroidTagReader
+    private lateinit var bacHandler: AndroidBacHandler
+    private lateinit var chipAuthenticationHandler: ChipAuthenticationHandler
+
+    init {
+        if (nfcAdapter == null) {
+            Toast.makeText(context, "NFC is not available !!!", Toast.LENGTH_SHORT).show()
+        } else {
+            Security.insertProviderAt(BouncyCastleProvider(), BOUNCY_CASTLE_PROVIDER_POSITION)
+        }
+    }
+
+    fun startListeningForegroundDispatch(
+        activity: Activity,
+        clazz: Class<*>, // this class will receive the intent with onNewIntent
+    ) {
+        if (nfcAdapter == null) {
+            Toast.makeText(context, "NFC is not available !!!", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val intent = Intent(activity, clazz).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val pendingIntent =
+            PendingIntent.getActivity(activity, 0, intent, PendingIntent.FLAG_MUTABLE)
+        val techList = arrayOf(arrayOf(IsoDep::class.java.name))
+        val filters = arrayOf(
+            IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED),
+            IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED),
+            IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED)
+        )
+        nfcAdapter?.enableForegroundDispatch(activity, pendingIntent, filters, techList)
+    }
+
+    fun disableForegroundDispatch(activity: Activity) {
+        nfcAdapter?.disableForegroundDispatch(activity)
+    }
+    
+    private suspend fun FlowCollector<ReadIdCardResponse>.validateBacKey(bacKey: BacKey): Boolean {
         if (bacKey.documentNumber.isEmpty()) {
-            return ReadIdCardResponse(
-                status = ReadIdCardStatus.Failed,
-                message = "Document number is empty",
-                data = mapOf()
+            emit(
+                ReadIdCardResponse(
+                    status = ReadIdCardStatus.Failed,
+                    message = "Document number is empty",
+                    data = mapOf()
+                )
             )
+            return false
         }
 
         if (bacKey.expireDate.isEmpty()) {
-            return ReadIdCardResponse(
-                status = ReadIdCardStatus.Failed,
-                message = "Expire date is empty",
-                data = mapOf()
+            emit(
+                ReadIdCardResponse(
+                    status = ReadIdCardStatus.Failed,
+                    message = "Expire date is empty",
+                    data = mapOf()
+                )
             )
+            return false
         }
 
         if (bacKey.birthDate.isEmpty()) {
-            return ReadIdCardResponse(
-                status = ReadIdCardStatus.Failed,
-                message = "Birth date is empty",
-                data = mapOf()
+            emit(
+                ReadIdCardResponse(
+                    status = ReadIdCardStatus.Failed,
+                    message = "Birth date is empty",
+                    data = mapOf()
+                )
             )
+            return false
         }
 
-        _passportState.update {
-            it.copy(
-                documentNumber = bacKey.documentNumber,
-                expireDate = bacKey.expireDate,
-                birthDate = bacKey.birthDate
-            )
-        }
-
-        return ReadIdCardResponse(
-            status = ReadIdCardStatus.Success,
-            message = "Bac key updated",
-            data = mapOf()
-        )
+        return true
     }
 
     /**
@@ -99,8 +129,12 @@ class AndroidPassportReader(
      * Function prepare to read passport id card
      * and return response if success or not.
      */
-    private fun prepareReadIdCard(): ReadIdCardResponse {
-        val response = tagReader.initialize()
+    private fun prepareReadIdCard(tag: Tag): ReadIdCardResponse {
+        tagReader = AndroidTagReader()
+        bacHandler = AndroidBacHandler()
+        chipAuthenticationHandler = ChipAuthenticationHandler()
+
+        val response = tagReader.initialize(tag)
         return response
     }
 
@@ -115,40 +149,52 @@ class AndroidPassportReader(
      * 1. Initialize the tag reader
      * 2. Select passport application
      */
-    fun startReadIdCard(): Flow<ReadIdCardResponse> = flow {
-        val initResponse = prepareReadIdCard()
-        if (!checkStatusAndEmit(initResponse, ReadIdCardStatus.InitializeSuccess)) return@flow
-        emitStartReading()
+    fun startReadIdCard(tag: Tag, bacKey: BacKey): Flow<ReadIdCardResponse> = flow {
+        if (!validateBacKey(bacKey)) return@flow
+        try {
+            val initResponse = prepareReadIdCard(tag)
+            if (!checkStatusAndEmit(initResponse, ReadIdCardStatus.InitializeSuccess)) return@flow
+            emitStartReading()
 
-        val response = tagReader.selectPassportApplication() // chose application run
-        val checkStatus = checkStatusAndEmit(
-            response,
-            ReadIdCardStatus.SelectPassportApplicationSuccess
-        )
-        if (!checkStatus) return@flow
-
-        val bacKey = makeBacKey()
-        val responseDoBac =
-            bacHandler.doBACAuthentication(tagReader, bacKey) // Machine Readable Zone
-        if (!checkStatusAndEmit(responseDoBac, ReadIdCardStatus.PerformBacSuccess)) return@flow
-
-        val dg14: Map<BigInteger, PublicKey> = readDataGroup14() ?: return@flow
-        val (key, value) = dg14.entries.iterator().next()
-
-        if (!chipAuthenticationPublicKeyInfos(key, value)) return@flow
-        val mrzInfo = readDataGroup1() ?: return@flow
-        val mrzData = collectStateMRZ(mrzInfo)
-
-        val facePath = readDataGroup2() ?: return@flow
-        mrzData.updateFacePath(facePath)
-
-        emit(
-            ReadIdCardResponse(
-                status = ReadIdCardStatus.Success,
-                message = "Passport id card read success",
-                data = mrzData.toMap()!!
+            val response = tagReader.selectPassportApplication() // chose application run
+            val checkStatus = checkStatusAndEmit(
+                response,
+                ReadIdCardStatus.SelectPassportApplicationSuccess
             )
-        )
+            if (!checkStatus) return@flow
+
+            val responseDoBac =
+                bacHandler.doBACAuthentication(tagReader, bacKey) // Machine Readable Zone
+            if (!checkStatusAndEmit(responseDoBac, ReadIdCardStatus.PerformBacSuccess)) return@flow
+
+            val dg14: Map<BigInteger, PublicKey> = readDataGroup14() ?: return@flow
+            val (key, value) = dg14.entries.iterator().next()
+
+            if (!chipAuthenticationPublicKeyInfos(key, value)) return@flow
+            val mrzInfo = readDataGroup1() ?: return@flow
+            val mrzData = collectStateMRZ(mrzInfo)
+
+            val facePath = readDataGroup2() ?: return@flow
+            mrzData.updateFacePath(facePath)
+
+            emit(
+                ReadIdCardResponse(
+                    status = ReadIdCardStatus.Success,
+                    message = "Passport id card read success",
+                    data = mrzData.toMap()!!
+                )
+            )
+        } catch (exception: Exception) {
+            emit(
+                ReadIdCardResponse(
+                    status = ReadIdCardStatus.Failed,
+                    message = "Failed to read passport id card ⚠️",
+                    data = mapOf()
+                )
+            )
+        } finally {
+            tagReader.finalize()
+        }
     }
 
     private fun collectStateMRZ(mrzInfo: MRZInfo): MRZResponse {
@@ -249,7 +295,7 @@ class AndroidPassportReader(
         val inputStream: InputStream = faceImageInfos.imageInputStream ?: return null
         val imageBytes: ByteArray = getImageBytes(inputStream) ?: return null
 
-        val directory = File(application.filesDir, ID_IMAGE_DIRECTORY)
+        val directory = File(context.filesDir, ID_IMAGE_DIRECTORY)
         if (directory.exists()) directory.mkdirs()
 
         val file = File(directory, "${System.currentTimeMillis() / 1000}.png")
@@ -311,14 +357,6 @@ class AndroidPassportReader(
         return dg1File.mrzInfo
     }
 
-    private fun makeBacKey(): BacKey {
-        return BacKey(
-            documentNumber = _passportState.value.documentNumber,
-            expireDate = _passportState.value.expireDate,
-            birthDate = _passportState.value.birthDate
-        )
-    }
-
     private suspend fun FlowCollector<ReadIdCardResponse>.emitStartReading() {
         emit(
             ReadIdCardResponse(
@@ -344,5 +382,6 @@ class AndroidPassportReader(
 
     companion object {
         private const val ID_IMAGE_DIRECTORY = "id_images"
+        private const val BOUNCY_CASTLE_PROVIDER_POSITION = 1
     }
 }

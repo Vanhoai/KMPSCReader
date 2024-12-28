@@ -1,17 +1,26 @@
-package org.ic.tech.main.core
+package org.ic.tech.main.core.handlers
 
 import arrow.core.Either
 import arrow.core.getOrElse
-import org.ic.tech.main.models.BacKey
-import org.ic.tech.main.models.ReadIdCardResponse
-import org.ic.tech.main.models.ReadIdCardStatus
+import org.ic.tech.main.AndroidTagReader
+import org.ic.tech.main.core.helpers.APDUValidator
+import org.ic.tech.main.core.helpers.AndroidCrypto
+import org.ic.tech.main.core.models.apdu.MISO7816
+import org.ic.tech.main.core.models.apdu.NFCISO7816APDU
+import org.ic.tech.main.core.helpers.PassportLib
+import org.ic.tech.main.core.helpers.SecureMessaging
+import org.ic.tech.main.core.algorithms.SecureMessagingSessionKeyGenerator
+import org.ic.tech.main.core.algorithms.SecureMessagingSupportedAlgorithms
+import org.ic.tech.main.core.models.common.BacKey
+import org.ic.tech.main.core.models.common.ReadIdCardResponse
+import org.ic.tech.main.core.models.common.ReadIdCardStatus
 import java.security.SecureRandom
 import javax.crypto.SecretKey
 
 class AndroidBacHandler {
 
     private val smk = SecureMessagingSessionKeyGenerator()
-    private val sm = AndroidSecureMessaging()
+    private val sm = AndroidCrypto()
 
     suspend fun doBACAuthentication(
         tagReader: AndroidTagReader,

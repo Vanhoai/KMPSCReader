@@ -1,4 +1,4 @@
-package org.ic.tech.main.core
+package org.ic.tech.main.core.models.common
 
 data class MRZResponse(
     val personalNumber: String,

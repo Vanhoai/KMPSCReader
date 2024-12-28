@@ -1,6 +1,6 @@
-package org.ic.tech.main.core
+package org.ic.tech.main.core.algorithms
 
-import org.ic.tech.main.models.BacKey
+import org.ic.tech.main.core.models.common.BacKey
 import java.io.UnsupportedEncodingException
 import java.security.GeneralSecurityException
 import java.security.MessageDigest

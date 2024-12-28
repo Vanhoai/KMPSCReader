@@ -1,4 +1,4 @@
-package org.ic.tech.main.models
+package org.ic.tech.main.core.models.common
 
 data class BacKey(
     val documentNumber: String,

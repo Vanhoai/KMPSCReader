@@ -1,5 +1,11 @@
-package org.ic.tech.main.core
+package org.ic.tech.main.core.handlers
 
+import org.ic.tech.main.AndroidTagReader
+import org.ic.tech.main.core.helpers.APDUValidator
+import org.ic.tech.main.core.helpers.PassportLib
+import org.ic.tech.main.core.helpers.SecureMessaging
+import org.ic.tech.main.core.algorithms.SecureMessagingSessionKeyGenerator
+import org.ic.tech.main.core.algorithms.SecureMessagingSupportedAlgorithms
 import java.math.BigInteger
 import java.security.KeyPairGenerator
 import java.security.MessageDigest
@@ -41,7 +47,7 @@ class ChipAuthenticationHandler() {
         val agreement = KeyAgreement.getInstance(agreementAlg)
         agreement.init(keyPair.private)
         agreement.doPhase(publicKey, true)
-        
+
         val secret = agreement.generateSecret()
 
         var keyData: ByteArray? = null

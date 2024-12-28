@@ -1,5 +1,7 @@
-package org.ic.tech.main.core
+package org.ic.tech.main.core.helpers
 
+import org.ic.tech.main.core.algorithms.SecureMessagingSupportedAlgorithms
+import org.ic.tech.main.core.models.apdu.NFCISO7816APDU
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -32,7 +34,7 @@ class SecureMessaging(
     val algorithm: SecureMessagingSupportedAlgorithms
 ) {
     private val padLength = if (algorithm == SecureMessagingSupportedAlgorithms.DES) 8 else 16
-    private val sm = AndroidSecureMessaging()
+    private val sm = AndroidCrypto()
 
     /**
      * Increment Secure Channel Counter (SCC)

@@ -1,4 +1,4 @@
-package org.ic.tech.main.core
+package org.ic.tech.main.core.models.apdu
 
 class NFCISO7816APDU(
     val cla: Int,
