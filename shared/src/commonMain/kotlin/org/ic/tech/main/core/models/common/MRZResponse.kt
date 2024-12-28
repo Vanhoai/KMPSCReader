@@ -33,4 +33,22 @@ data class MRZResponse(
             "facePath" to facePath!!,
         )
     }
+
+    companion object {
+        fun fromMap(map: Map<String, Any>): MRZResponse {
+            return MRZResponse(
+                personalNumber = map["personalNumber"] as String,
+                documentType = map["documentType"] as Int,
+                documentCode = map["documentCode"] as String,
+                documentNumber = map["documentNumber"] as String,
+                name = map["name"] as String,
+                dateOfBirth = map["dateOfBirth"] as String,
+                dateOfExpiry = map["dateOfExpiry"] as String,
+                gender = map["gender"] as String,
+                nationality = map["nationality"] as String,
+                issuingState = map["issuingState"] as String,
+                facePath = map["facePath"] as String?,
+            )
+        }
+    }
 }

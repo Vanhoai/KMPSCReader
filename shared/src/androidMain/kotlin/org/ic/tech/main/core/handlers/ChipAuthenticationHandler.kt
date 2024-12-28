@@ -15,9 +15,7 @@ import javax.crypto.interfaces.DHPublicKey
 import java.security.spec.AlgorithmParameterSpec
 import javax.crypto.KeyAgreement
 
-class ChipAuthenticationHandler() {
-    private val sm = SecureMessagingSessionKeyGenerator()
-
+class ChipAuthenticationHandler(private val secureMessagingSessionKeyGenerator: SecureMessagingSessionKeyGenerator) {
     fun doChipAuthentication(
         tagReader: AndroidTagReader,
         key: BigInteger,
@@ -75,8 +73,8 @@ class ChipAuthenticationHandler() {
 
         val resSendMSEKAT = tagReader.sendMSEKAT(keyData, idData)
 
-        val ksEnc = sm.deriveKey(secret, counter = 1)
-        val ksMac = sm.deriveKey(secret, counter = 2)
+        val ksEnc = secureMessagingSessionKeyGenerator.deriveKey(secret, counter = 1)
+        val ksMac = secureMessagingSessionKeyGenerator.deriveKey(secret, counter = 2)
         val ssc = 0L
 
         val secureMessaging = SecureMessaging(

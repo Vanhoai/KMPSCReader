@@ -11,9 +11,11 @@ import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
 import android.widget.Toast
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
+import org.ic.tech.main.core.algorithms.SecureMessagingSessionKeyGenerator
 import org.ic.tech.main.core.handlers.AndroidBacHandler
 import org.ic.tech.main.core.handlers.ChipAuthenticationHandler
 import org.ic.tech.main.core.models.apdu.DataGroup
@@ -92,7 +94,7 @@ class AndroidPassportReader(private val context: Context) {
         if (bacKey.documentNumber.isEmpty()) {
             emit(
                 ReadIdCardResponse(
-                    status = ReadIdCardStatus.Failed,
+                    status = ReadIdCardStatus.ReadIdCardFailed,
                     message = "Document number is empty",
                     data = mapOf()
                 )
@@ -103,7 +105,7 @@ class AndroidPassportReader(private val context: Context) {
         if (bacKey.expireDate.isEmpty()) {
             emit(
                 ReadIdCardResponse(
-                    status = ReadIdCardStatus.Failed,
+                    status = ReadIdCardStatus.ReadIdCardFailed,
                     message = "Expire date is empty",
                     data = mapOf()
                 )
@@ -114,7 +116,7 @@ class AndroidPassportReader(private val context: Context) {
         if (bacKey.birthDate.isEmpty()) {
             emit(
                 ReadIdCardResponse(
-                    status = ReadIdCardStatus.Failed,
+                    status = ReadIdCardStatus.ReadIdCardFailed,
                     message = "Birth date is empty",
                     data = mapOf()
                 )
@@ -125,7 +127,7 @@ class AndroidPassportReader(private val context: Context) {
         if (facePathStorage.isEmpty()) {
             emit(
                 ReadIdCardResponse(
-                    status = ReadIdCardStatus.Failed,
+                    status = ReadIdCardStatus.ReadIdCardFailed,
                     message = "Please provide a path for storage face image",
                     data = mapOf()
                 )
@@ -143,10 +145,14 @@ class AndroidPassportReader(private val context: Context) {
      * Function prepare to read passport id card
      * and return response if success or not.
      */
-    private fun prepareReadIdCard(tag: Tag): ReadIdCardResponse {
-        tagReader = AndroidTagReader()
-        bacHandler = AndroidBacHandler()
-        chipAuthenticationHandler = ChipAuthenticationHandler()
+    private fun prepareReadIdCard(tag: Tag, facePathStorage: String): ReadIdCardResponse {
+        this.facePathStorage = facePathStorage
+
+        val sm = SecureMessagingSessionKeyGenerator()
+        this.tagReader = AndroidTagReader()
+
+        this.bacHandler = AndroidBacHandler(sm)
+        this.chipAuthenticationHandler = ChipAuthenticationHandler(sm)
 
         val response = tagReader.initialize(tag)
         return response
@@ -169,22 +175,44 @@ class AndroidPassportReader(private val context: Context) {
         facePathStorage: String,
     ): Flow<ReadIdCardResponse> = flow {
         if (!validatePayload(bacKey, facePathStorage)) return@flow
+        emit(
+            ReadIdCardResponse(
+                ReadIdCardStatus.StartReading,
+                message = "Start reading passport id card ✅",
+                data = mapOf()
+            )
+        )
         try {
-            val initResponse = prepareReadIdCard(tag)
+            val initResponse = prepareReadIdCard(tag, facePathStorage)
             if (!checkStatusAndEmit(initResponse, ReadIdCardStatus.InitializeSuccess)) return@flow
             emitStartReading()
+            delay(1000L)
 
-            val response = tagReader.selectPassportApplication() // chose application run
+            val response = tagReader.selectPassportApplication()
             val checkStatus = checkStatusAndEmit(
                 response,
                 ReadIdCardStatus.SelectPassportApplicationSuccess
             )
+            delay(1000L)
             if (!checkStatus) return@flow
 
             val responseDoBac =
                 bacHandler.doBACAuthentication(tagReader, bacKey) // Machine Readable Zone
-            if (!checkStatusAndEmit(responseDoBac, ReadIdCardStatus.PerformBacSuccess)) return@flow
+            if (!checkStatusAndEmit(
+                    responseDoBac,
+                    ReadIdCardStatus.PerformBasicAccessControlSuccess
+                )
+            ) return@flow
 
+            emit(
+                ReadIdCardResponse(
+                    ReadIdCardStatus.AccessingDataGroup,
+                    message = "Accessing data group ... ",
+                    data = mapOf()
+                )
+            )
+
+            delay(1000L)
             val dg14: Map<BigInteger, PublicKey> = readDataGroup14() ?: return@flow
             val (key, value) = dg14.entries.iterator().next()
 
@@ -197,7 +225,7 @@ class AndroidPassportReader(private val context: Context) {
 
             emit(
                 ReadIdCardResponse(
-                    status = ReadIdCardStatus.Success,
+                    status = ReadIdCardStatus.ReadIdCardSuccess,
                     message = "Passport id card read success",
                     data = mrzData.toMap()!!
                 )
@@ -205,9 +233,11 @@ class AndroidPassportReader(private val context: Context) {
         } catch (exception: Exception) {
             emit(
                 ReadIdCardResponse(
-                    status = ReadIdCardStatus.Failed,
+                    status = ReadIdCardStatus.ReadIdCardFailed,
                     message = "Failed to read passport id card ⚠️",
-                    data = mapOf()
+                    data = mapOf(
+                        "exception" to (exception.message ?: "Unknown error")
+                    )
                 )
             )
         } finally {
@@ -254,7 +284,7 @@ class AndroidPassportReader(private val context: Context) {
         if (responseChipAuthentication) return true
         emit(
             ReadIdCardResponse(
-                status = ReadIdCardStatus.Failed,
+                status = ReadIdCardStatus.ReadIdCardFailed,
                 message = "Chip Authentication failed ⚠️",
                 data = mapOf()
             )
@@ -267,7 +297,7 @@ class AndroidPassportReader(private val context: Context) {
         if (data == null) {
             emit(
                 ReadIdCardResponse(
-                    status = ReadIdCardStatus.Failed,
+                    status = ReadIdCardStatus.ReadIdCardFailed,
                     message = "DataGroup14 is empty ⚠️",
                     data = mapOf()
                 )
@@ -278,27 +308,12 @@ class AndroidPassportReader(private val context: Context) {
         return dg14File.chipAuthenticationPublicKeyInfos
     }
 
-//    val dg2File = MDG2File(data.inputStream())
-//
-//    val faceInfos = dg2File.getFaceInfos()[0]
-//    val faceImageInfos = faceInfos.getSubRecords()[0]
-//
-//    val inputStream: InputStream = faceImageInfos.getImageInputStream() ?: return null
-//    val imageBytes: ByteArray = ImageUtils.getImageBytes(inputStream) ?: return null
-//
-//    val directory = File(application.filesDir, ID_IMAGE_DIRECTORY)
-//    if (directory.exists()) directory.mkdirs()
-//
-//    val file = File(directory, "${System.currentTimeMillis() / 1000}.png")
-//    ImageUtils.writeImageBytesToFile(imageBytes, file.path)
-//    return file.path
-
     private suspend fun FlowCollector<ReadIdCardResponse>.readDataGroup2(): String? {
         val data = tagReader.sendSelectFileAndReadDataGroup(dg = DataGroup.DG2)
         if (data == null) {
             emit(
                 ReadIdCardResponse(
-                    status = ReadIdCardStatus.Failed,
+                    status = ReadIdCardStatus.ReadIdCardFailed,
                     message = "DataGroup2 is empty ⚠️",
                     data = mapOf()
                 )
@@ -317,6 +332,7 @@ class AndroidPassportReader(private val context: Context) {
         if (directory.exists()) directory.mkdirs()
 
         val file = File(directory, "${System.currentTimeMillis() / 1000}.png")
+        if (file.exists()) file.delete()
         writeImageBytesToFile(imageBytes, file.path)
         return file.path
     }
@@ -324,12 +340,8 @@ class AndroidPassportReader(private val context: Context) {
     private fun writeImageBytesToFile(imageBytes: ByteArray, path: String): Boolean {
         val file = File(path)
         val directory = file.parentFile ?: return false
-        if (!directory.exists()) {
-            directory.mkdirs()
-        }
-        if (!file.exists()) {
-            file.createNewFile()
-        }
+        if (!directory.exists()) directory.mkdirs()
+        if (!file.exists()) file.createNewFile()
         file.outputStream().use {
             it.write(imageBytes)
         }
@@ -364,7 +376,7 @@ class AndroidPassportReader(private val context: Context) {
         if (data == null) {
             emit(
                 ReadIdCardResponse(
-                    status = ReadIdCardStatus.Failed,
+                    status = ReadIdCardStatus.ReadIdCardFailed,
                     message = "DataGroup1 is empty ⚠️",
                     data = mapOf()
                 )
@@ -389,7 +401,7 @@ class AndroidPassportReader(private val context: Context) {
         response: ReadIdCardResponse,
         statusExpected: ReadIdCardStatus
     ): Boolean {
-        if (response.status == ReadIdCardStatus.Failed) {
+        if (response.status == ReadIdCardStatus.ReadIdCardFailed) {
             emit(response)
             return false
         }

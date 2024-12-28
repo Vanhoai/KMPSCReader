@@ -140,7 +140,7 @@ object PassportLib {
             // Build DO8587 command if command data length is greater than zero
             val has85 = apdu.ins == 0xB1
             val data = padWithMRZ(apdu.data!!, blockSize = padLength)
-            val encryptedData = sm.cipherEncrypt(ksEnc, data)
+            val encryptedData = AndroidCrypto.cipherEncrypt(ksEnc, data)
 
             val ous = ByteArrayOutputStream()
             ous.write((if (has85) 0x85.toByte() else 0x87.toByte()).toInt())

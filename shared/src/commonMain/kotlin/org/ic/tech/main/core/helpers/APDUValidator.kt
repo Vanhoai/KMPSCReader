@@ -147,7 +147,7 @@ object APDUValidator {
 
     fun parseResponse(response: ByteArray): ReadIdCardResponse {
         if (response.size < 2) return ReadIdCardResponse(
-            status = ReadIdCardStatus.Failed,
+            status = ReadIdCardStatus.ReadIdCardFailed,
             message = "Response from chip is empty",
             data = mapOf()
         )
@@ -156,13 +156,13 @@ object APDUValidator {
         val sw2 = response[response.size - 1].toUByte()
 
         if (!isSuccess(sw1, sw2)) return ReadIdCardResponse(
-            status = ReadIdCardStatus.Failed,
+            status = ReadIdCardStatus.ReadIdCardFailed,
             message = decodeStatus(sw1, sw2),
             data = mapOf()
         )
 
         return ReadIdCardResponse(
-            status = ReadIdCardStatus.Success,
+            status = ReadIdCardStatus.ReadIdCardSuccess,
             message = "Response from chip is success ✅",
             data = mapOf()
         )

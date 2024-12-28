@@ -32,7 +32,7 @@ class AndroidTagReader {
             )
         } catch (exception: Exception) {
             return ReadIdCardResponse(
-                status = ReadIdCardStatus.Failed,
+                status = ReadIdCardStatus.ReadIdCardFailed,
                 message = "Failed to initialize tag reader ⚠️",
                 data = mapOf()
             )
@@ -60,6 +60,7 @@ class AndroidTagReader {
             return false
         } finally {
             isoDep = null
+            secureMessaging = null
         }
     }
 

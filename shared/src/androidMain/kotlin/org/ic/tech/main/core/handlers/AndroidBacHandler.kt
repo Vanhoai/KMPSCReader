@@ -17,25 +17,22 @@ import org.ic.tech.main.core.models.common.ReadIdCardStatus
 import java.security.SecureRandom
 import javax.crypto.SecretKey
 
-class AndroidBacHandler {
-
-    private val smk = SecureMessagingSessionKeyGenerator()
-    private val sm = AndroidCrypto()
+class AndroidBacHandler(private val secureMessagingSessionKeyGenerator: SecureMessagingSessionKeyGenerator) {
 
     suspend fun doBACAuthentication(
         tagReader: AndroidTagReader,
         bacKey: BacKey
     ): ReadIdCardResponse {
         try {
-            val keySeed = smk.computeKeySeedForBAC(bacKey)
+            val keySeed = secureMessagingSessionKeyGenerator.computeKeySeedForBAC(bacKey)
 
-            val kEnc = smk.deriveKey(keySeed, counter = 1)
-            val kMac = smk.deriveKey(keySeed, counter = 2)
+            val kEnc = secureMessagingSessionKeyGenerator.deriveKey(keySeed, counter = 1)
+            val kMac = secureMessagingSessionKeyGenerator.deriveKey(keySeed, counter = 2)
 
             return performBacAndGetSessionKey(tagReader, kEnc, kMac)
         } catch (exception: Exception) {
             return ReadIdCardResponse(
-                status = ReadIdCardStatus.Failed,
+                status = ReadIdCardStatus.ReadIdCardFailed,
                 message = "Failed to Bac Authentication ⚠️with message: ${exception.message}",
                 data = mapOf()
             )
@@ -68,7 +65,7 @@ class AndroidBacHandler {
     ): ReadIdCardResponse {
         val rndICC = tagReader.sendGetChallenge()
         if (rndICC.isEmpty()) return ReadIdCardResponse(
-            status = ReadIdCardStatus.Failed,
+            status = ReadIdCardStatus.ReadIdCardFailed,
             message = "Failed to get challenge ⚠️",
             data = mapOf()
         )
@@ -100,7 +97,7 @@ class AndroidBacHandler {
 
         tagReader.updateSecureMessaging(secureMessaging)
         return ReadIdCardResponse(
-            status = ReadIdCardStatus.PerformBacSuccess,
+            status = ReadIdCardStatus.PerformBasicAccessControlSuccess,
             message = "Perform BAC success and update session key ready for get data group ✅",
             data = mapOf()
         )
@@ -118,9 +115,9 @@ class AndroidBacHandler {
         }
 
         // Generate keys for encryption and mac
-        val ksEnc = smk.deriveKey(keySeed, counter = 1)
-        val ksMac = smk.deriveKey(keySeed, counter = 2)
-        val ssc = smk.computeSendSequenceCounter(rndICC, rndIFD)
+        val ksEnc = secureMessagingSessionKeyGenerator.deriveKey(keySeed, counter = 1)
+        val ksMac = secureMessagingSessionKeyGenerator.deriveKey(keySeed, counter = 2)
+        val ssc = secureMessagingSessionKeyGenerator.computeSendSequenceCounter(rndICC, rndIFD)
 
         return mapOf(
             "KSEnc" to ksEnc,
@@ -147,10 +144,10 @@ class AndroidBacHandler {
         System.arraycopy(rndICC, 0, data, 8, 8)
         System.arraycopy(kIFD, 0, data, 16, 16)
 
-        val encryptedData = sm.cipherEncrypt(kEnc, data)
+        val encryptedData = AndroidCrypto.cipherEncrypt(kEnc, data)
         require(encryptedData.size == 32) { "Encrypted data must be 32 bytes long" }
 
-        val signature = sm.macSign(kMac, PassportLib.padWithMRZ(encryptedData))
+        val signature = AndroidCrypto.macSign(kMac, PassportLib.padWithMRZ(encryptedData))
         require(signature.size == 8) { "Signature must be 8 bytes long" }
 
         // Prepare APDU
@@ -178,7 +175,7 @@ class AndroidBacHandler {
             val message = APDUValidator.decodeStatus(response)
             return Either.Left(
                 ReadIdCardResponse(
-                    status = ReadIdCardStatus.Failed,
+                    status = ReadIdCardStatus.ReadIdCardFailed,
                     message = "Failed to send Mutual Authentication ⚠️ with message: $message",
                     data = mapOf()
                 )
@@ -188,7 +185,7 @@ class AndroidBacHandler {
 
         require(responseBytes.size == 40) { "Response bytes must be 40 bytes long" }
         // Decrypt data 32 byte first in response -> except 8 byte signature
-        val decryptedData = sm.cipherDecrypt(
+        val decryptedData = AndroidCrypto.cipherDecrypt(
             kEnc,
             responseBytes,
             offset = 0,

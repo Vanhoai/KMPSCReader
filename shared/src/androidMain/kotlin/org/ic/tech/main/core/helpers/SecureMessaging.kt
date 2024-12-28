@@ -71,7 +71,7 @@ class SecureMessaging(
         val do8587 = PassportLib.buildDO8587(apdu = apdu, padLength, ksEnc, sm)
 
         val prefix = PassportLib.buildPrefix(masked, do8587, do97, ssc)
-        val mac = sm.macSign(ksMac, prefix)
+        val mac = AndroidCrypto.macSign(ksMac, prefix)
         require(mac.size == 8) { "MAC must be 8 bytes long" }
         val do8E = PassportLib.build8E(mac)
 
@@ -97,7 +97,7 @@ class SecureMessaging(
         var finished = false
         var cc: ByteArray? = null
 
-        val cipher = sm.initializeCipher(ksEnc, Cipher.DECRYPT_MODE)
+        val cipher = AndroidCrypto.initializeCipher(ksEnc, Cipher.DECRYPT_MODE)
         while (!finished) {
             val tag = inputStream.readByte().toInt()
             when (tag.toByte()) {
@@ -130,7 +130,7 @@ class SecureMessaging(
             dataOut.flush()
             dataOut.close()
 
-            var cc2: ByteArray = sm.macSign(ksMac, bOut.toByteArray())
+            var cc2: ByteArray = AndroidCrypto.macSign(ksMac, bOut.toByteArray())
             if (cc2.size > 8 && cc1.size == 8) {
                 val newCC2 = ByteArray(8)
                 System.arraycopy(cc2, 0, newCC2, 0, newCC2.size)
