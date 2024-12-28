@@ -78,9 +78,9 @@ fun MainApp() {
         LaunchedEffect(currentTag.value) {
             currentTag.value?.let { tag ->
                 val bacKey = BacKey(
-                    documentNumber = "203014513",
-                    expireDate = "281224",
-                    birthDate = "031224"
+                    documentNumber = "20301451", // Replace with your document number
+                    expireDate = "011224", // Replace with your expire date
+                    birthDate = "011224" // Replace with your birth date
                 )
                 passportReader.startReadIdCardAndroid(tag, bacKey, "id_images").collect { result ->
                     Log.d("MainApplication", "Message: ${result.message}")
