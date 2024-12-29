@@ -1,13 +1,18 @@
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import com.android.build.gradle.internal.utils.createPublishingInfoForApp
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
+    id("maven-publish")
 }
+
+group = "com.ic.tech"
+version = "1.0.0"
 
 kotlin {
     androidTarget {
+        publishLibraryVariants("release")
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_11)
         }
@@ -19,7 +24,7 @@ kotlin {
         iosSimulatorArm64()
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
-            baseName = "Shared"
+            baseName = "SmartCardReader"
             isStatic = true
 
             export(libs.mvvm.core)
@@ -67,5 +72,32 @@ android {
 
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
+    }
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("release") {
+            from(components["kotlin"])
+            groupId = "com.ic.tech"
+            artifactId = "sc-reader"
+            version = "1.0.0"
+            pom {
+                name.set("Smart Card Reader Library")
+                description.set("Kotlin Multiplatform library for reading Smart Cards.")
+                url.set("https://github.com/Vanhoai/KMP_ReadSC")
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/Vanhoai/KMP_ReadSC")
+            credentials {
+                username = project.findProject("gpr.user").toString()
+                password = project.findProject("gpr.key").toString()
+            }
+        }
     }
 }
