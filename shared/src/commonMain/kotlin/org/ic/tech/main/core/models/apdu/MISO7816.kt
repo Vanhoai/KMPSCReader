@@ -1,0 +1,93 @@
+package org.ic.tech.main.core.models.apdu
+
+object MISO7816 {
+    const val OFFSET_CLA: Byte = 0.toByte()
+    const val OFFSET_INS: Byte = 1.toByte()
+    const val OFFSET_P1: Byte = 2.toByte()
+    const val OFFSET_P2: Byte = 3.toByte()
+    const val OFFSET_LC: Byte = 4.toByte()
+    const val OFFSET_CDATA: Byte = 5.toByte()
+
+    const val CLA_ISO7816: Byte = 0x00.toByte()
+    const val CLA_COMMAND_CHAINING: Byte = 0x10.toByte()
+
+    const val INVALIDATE_CHV: Byte = 0x04
+    const val INS_ERASE_BINARY: Byte = 0x0E
+    const val INS_VERIFY: Byte = 0x20
+    const val INS_CHANGE_CHV: Byte = 0x24
+    const val INS_UNBLOCK_CHV: Byte = 0x2C
+    const val INS_DECREASE: Byte = 0x30
+    const val INS_INCREASE: Byte = 0x32
+
+    const val INS_DECREASE_STAMPED: Byte = 0x34
+    const val INS_REHABILITATE_CHV: Byte = 0x44
+    const val INS_MANAGE_CHANNEL: Byte = 0x70
+    const val INS_EXTERNAL_AUTHENTICATE: Byte = 0x82.toByte()
+    const val INS_MUTUAL_AUTHENTICATE: Byte = 0x82.toByte()
+    const val INS_GET_CHALLENGE: Byte = 0x84.toByte()
+    const val INS_ASK_RANDOM: Byte = 0x84.toByte()
+    const val INS_GIVE_RANDOM: Byte = 0x86.toByte()
+    const val INS_INTERNAL_AUTHENTICATE: Byte = 0x88.toByte()
+    const val INS_SEEK: Byte = 0xA2.toByte()
+    const val INS_SELECT: Byte = 0xA4.toByte()
+    const val INS_SELECT_FILE: UByte = 0xA4u
+    const val INS_CLOSE_APPLICATION: Byte = 0xAC.toByte()
+    const val INS_READ_BINARY: Byte = 0xB0.toByte()
+    const val INS_READ_BINARY2: UByte = 0xB1u
+    const val INS_READ_RECORD: Byte = 0xB2.toByte()
+    const val INS_READ_RECORD2: Byte = 0xB3.toByte()
+    const val INS_READ_RECORDS: Byte = 0xB2.toByte()
+    const val INS_READ_BINARY_STAMPED: Byte = 0xB4.toByte()
+    const val INS_READ_RECORD_STAMPED: Byte = 0xB6.toByte()
+    const val INS_GET_RESPONSE: Byte = 0xC0.toByte()
+    const val INS_ENVELOPE: Byte = 0xC2.toByte()
+    const val INS_GET_DATA: Byte = 0xCA.toByte()
+    const val INS_WRITE_BINARY: Byte = 0xD0.toByte()
+    const val INS_WRITE_RECORD: Byte = 0xD2.toByte()
+    const val INS_UPDATE_BINARY: Byte = 0xD6.toByte()
+    const val INS_LOAD_KEY_FILE: Byte = 0xD8.toByte()
+    const val INS_PUT_DATA: Byte = 0xDA.toByte()
+    const val INS_UPDATE_RECORD: Byte = 0xDC.toByte()
+    const val INS_CREATE_FILE: Byte = 0xE0.toByte()
+    const val INS_APPEND_RECORD: Byte = 0xE2.toByte()
+    const val INS_DELETE_FILE: Byte = 0xE4.toByte()
+    const val INS_PSO: Byte = 0x2A.toByte()
+    const val INS_MSE: UByte = 0x22u
+
+    const val SW_BYTES_REMAINING_00: Short = 0x6100.toShort()
+    const val SW_STATE_NON_VOLATILE_MEMORY_UNCHANGED_NO_INFORMATION_GIVEN: Short = 0x6200.toShort()
+    const val SW_END_OF_FILE: Short = 0x6282.toShort()
+    const val SW_LESS_DATA_RESPONDED_THAN_REQUESTED: Short = 0x6287.toShort()
+    const val SW_NON_VOLATILE_MEMORY_CHANGED_NO_INFORMATION_GIVEN: Short = 0x6300.toShort()
+    const val SW_NON_VOLATILE_MEMORY_CHANGED_FILE_FILLED_UP_BY_LAST_WRITE: Short = 0x6381.toShort()
+    const val SW_NON_VOLATILE_MEMORY_CHANGED_COUNTER_0: Short = 0x63C0.toShort()
+    const val SW_WRONG_LENGTH: Short = 0x6700.toShort()
+    const val SW_LOGICAL_CHANNEL_NOT_SUPPORTED: Short = 0x6881.toShort()
+    const val SW_SECURE_MESSAGING_NOT_SUPPORTED: Short = 0x6882.toShort()
+    const val SW_LAST_COMMAND_EXPECTED: Short = 0x6883.toShort()
+    const val SW_SECURITY_STATUS_NOT_SATISFIED: Short = 0x6982.toShort()
+    const val SW_FILE_INVALID: Short = 0x6983.toShort()
+    const val SW_DATA_INVALID: Short = 0x6984.toShort()
+    const val SW_CONDITIONS_NOT_SATISFIED: Short = 0x6985.toShort()
+    const val SW_COMMAND_NOT_ALLOWED: Short = 0x6986.toShort()
+    const val SW_EXPECTED_SM_DATA_OBJECTS_MISSING: Short = 0x6987.toShort()
+    const val SW_SM_DATA_OBJECTS_INCORRECT: Short = 0x6988.toShort()
+    const val SW_APPLET_SELECT_FAILED: Short = 0x6999.toShort()
+    const val SW_KEY_USAGE_ERROR: Short = 0x69C1.toShort()
+    const val SW_WRONG_DATA: Short = 0x6A80.toShort()
+    const val SW_FILE_HEADER_INCONSISTENT: Short = 0x6A80.toShort()
+    const val SW_FUNC_NOT_SUPPORTED: Short = 0x6A81.toShort()
+    const val SW_FILE_NOT_FOUND: Short = 0x6A82.toShort()
+    const val SW_RECORD_NOT_FOUND: Short = 0x6A83.toShort()
+    const val SW_FILE_FULL: Short = 0x6A84.toShort()
+    const val SW_OUT_OF_MEMORY: Short = 0x6A84.toShort()
+    const val SW_INCORRECT_P1P2: Short = 0x6A86.toShort()
+    const val SW_KEY_NOT_FOUND: Short = 0x6A88.toShort()
+    const val SW_WRONG_P1P2: Short = 0x6B00.toShort()
+    const val SW_CORRECT_LENGTH_00: Short = 0x6C00.toShort()
+    const val SW_INS_NOT_SUPPORTED: Short = 0x6D00.toShort()
+    const val SW_CLA_NOT_SUPPORTED: Short = 0x6E00.toShort()
+    const val SW_UNKNOWN: Short = 0x6F00.toShort()
+    const val SW_CARD_TERMINATED: Short = 0x6FFF.toShort()
+    const val SW_NO_ERROR: Short = 0x9000.toShort()
+}

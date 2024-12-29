@@ -50,6 +50,10 @@ kotlin {
             api(libs.mvvm.flow)
         }
     }
+
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
 }
 
 android {
