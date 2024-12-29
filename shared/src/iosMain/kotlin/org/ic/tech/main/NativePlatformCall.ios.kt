@@ -22,7 +22,12 @@ actual class NativePlatformCall {
         tag: Any,
         bacKey: BacKey,
         facePathStorage: String
-    ) {
-        TODO("Not yet implemented")
-    }
+    ) = Unit
+
+    actual fun startListeningForegroundDispatchAndroid(
+        activity: Any,
+        clazz: Any
+    ): Boolean = true
+
+    actual fun disableForegroundDispatchAndroid(activity: Any): Boolean = true
 }
