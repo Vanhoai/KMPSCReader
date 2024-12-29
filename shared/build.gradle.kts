@@ -12,7 +12,7 @@ version = "1.0.0"
 
 kotlin {
     androidTarget {
-        publishLibraryVariants("release", "debug")
+        publishLibraryVariants("release")
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_11)
         }
@@ -76,15 +76,27 @@ android {
 }
 
 publishing {
+    publications {
+        create<MavenPublication>("release") {
+            from(components["kotlin"])
+            groupId = "com.ic.tech"
+            artifactId = "sc-reader"
+            version = "1.0.0"
+            pom {
+                name.set("Smart Card Reader Library")
+                description.set("Kotlin Multiplatform library for reading Smart Cards.")
+                url.set("https://github.com/Vanhoai/KMP_ReadSC")
+            }
+        }
+    }
+
     repositories {
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/Vanhoai/KMP_ReadSC")
             credentials {
-                username =
-                    project.findProject("gpr.user") as String? ?: System.getenv("GITHUB_USERNAME")
-                password =
-                    project.findProject("gpr.key") as String? ?: System.getenv("GITHUB_TOKEN")
+                username = project.findProject("gpr.user").toString()
+                password = project.findProject("gpr.key").toString()
             }
         }
     }
